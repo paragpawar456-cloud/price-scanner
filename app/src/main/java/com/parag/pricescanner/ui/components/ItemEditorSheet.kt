@@ -73,6 +73,7 @@ fun ItemEditorSheet(
     showDate: Boolean = false,
     onDelete: (() -> Unit)? = null,
     nutrition: com.parag.pricescanner.scan.Nutrition? = null,
+    imageUrl: String? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var name by remember { mutableStateOf(initial.name) }
@@ -96,7 +97,13 @@ fun ItemEditorSheet(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            Text(title, style = MaterialTheme.typography.titleLarge)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (imageUrl != null) {
+                    ProductThumb(imageUrl, initial.name, size = 72.dp)
+                    Spacer(Modifier.width(14.dp))
+                }
+                Text(title, style = MaterialTheme.typography.titleLarge)
+            }
             Spacer(Modifier.height(16.dp))
 
             OutlinedTextField(

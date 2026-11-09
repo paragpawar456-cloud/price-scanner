@@ -21,6 +21,8 @@ data class Purchase(
     val expiryDate: Long? = null,
     /** Nutrition per 100 g, encoded by Nutrition.encode(). */
     val nutrition: String? = null,
+    /** Product photo URL found online (Open Food Facts). */
+    val imageUrl: String? = null,
 ) {
     val total: Double get() = unitPrice * quantity
 
@@ -37,4 +39,5 @@ data class KnownProduct(
     val name: String,
     val lastPrice: Double,
     val nutrition: String? = null,
+    val imageUrl: String? = null,
 )

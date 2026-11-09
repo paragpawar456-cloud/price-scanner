@@ -201,11 +201,12 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
             ),
             priceSuggestions = d?.alternatives.orEmpty(),
             nutrition = d?.nutrition,
+            imageUrl = d?.imageUrl,
             nameSuggestions = names,
             confirmLabel = "Add to list",
             onDismiss = { captureOpen = false },
             onSave = { draft ->
-                vm.addManual(draft.name, draft.price ?: 0.0, draft.qty, d?.barcode, draft.mfgDate, draft.expiryDate, d?.nutrition)
+                vm.addManual(draft.name, draft.price ?: 0.0, draft.qty, d?.barcode, draft.mfgDate, draft.expiryDate, d?.nutrition, d?.imageUrl)
                 captureOpen = false
             },
         )
@@ -215,6 +216,7 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
             title = "Edit item",
             initial = ItemDraft(item.name, item.price, item.qty, mfgDate = item.mfgDate, expiryDate = item.expiryDate),
             nutrition = item.nutrition,
+            imageUrl = item.imageUrl,
             nameSuggestions = names,
             onDismiss = { editing = null },
             onSave = { draft ->
@@ -308,7 +310,10 @@ private fun DetectionBubble(d: Detection?, modifier: Modifier = Modifier, onClic
         if (d == null) return@AnimatedVisibility
         Surface(onClick = onClick, shape = RoundedCornerShape(20.dp), color = Color.Black.copy(alpha = 0.7f), contentColor = Color.White) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                if (d.barcode != null) {
+                if (d.imageUrl != null) {
+                    com.parag.pricescanner.ui.components.ProductThumb(d.imageUrl, d.displayName.orEmpty(), size = 52.dp)
+                    Spacer(Modifier.width(12.dp))
+                } else if (d.barcode != null) {
                     Icon(Icons.Rounded.QrCode2, null, tint = Mint, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                 }
@@ -519,6 +524,8 @@ private fun CartRow(item: CartItem, onClick: () -> Unit, onQty: (Int) -> Unit) {
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        com.parag.pricescanner.ui.components.ProductThumb(item.imageUrl, item.name, size = 44.dp)
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(item.name, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (item.needsPrice) {

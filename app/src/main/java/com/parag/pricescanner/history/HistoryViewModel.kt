@@ -105,17 +105,21 @@ class HistoryViewModel(private val app: Application) : AndroidViewModel(app) {
                 mfgDate = mfg?.toEpochDay(), expiryDate = exp?.toEpochDay(),
             )
         )
+        runCatching { repo.fillPhoto(name) }
     }
 
     fun update(p: Purchase, name: String, price: Double, qty: Int, date: LocalDate, mfg: LocalDate?, exp: LocalDate?) = viewModelScope.launch {
+        val renamed = name != p.productName && p.barcode == null
         repo.update(
             p.copy(
                 productName = name, unitPrice = price, quantity = qty,
+                imageUrl = if (renamed) null else p.imageUrl,
                 mfgDate = mfg?.toEpochDay(), expiryDate = exp?.toEpochDay(),
                 timestamp = if (Fmt.date(p.timestamp) == date) p.timestamp else timestampFor(date, p.timestamp),
                 source = Purchase.SOURCE_MANUAL,
             )
         )
+        if (renamed) runCatching { repo.fillPhoto(name) }
     }
 
     fun delete(p: Purchase) = viewModelScope.launch { repo.delete(p) }

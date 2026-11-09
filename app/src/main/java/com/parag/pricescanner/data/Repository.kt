@@ -14,7 +14,7 @@ class Repository private constructor(private val db: AppDatabase) {
         if (items.isEmpty()) return
         db.purchases().insertAll(items)
         val known = items.filter { !it.barcode.isNullOrBlank() }
-            .map { KnownProduct(it.barcode!!, it.productName, it.unitPrice, it.nutrition) }
+            .map { KnownProduct(it.barcode!!, it.productName, it.unitPrice, it.nutrition, it.imageUrl) }
         if (known.isNotEmpty()) db.knownProducts().upsertAll(known)
     }
 
@@ -22,12 +22,30 @@ class Repository private constructor(private val db: AppDatabase) {
     suspend fun update(item: Purchase) {
         db.purchases().update(item)
         item.barcode?.takeIf { it.isNotBlank() }?.let {
-            db.knownProducts().upsert(KnownProduct(it, item.productName, item.unitPrice, item.nutrition))
+            db.knownProducts().upsert(KnownProduct(it, item.productName, item.unitPrice, item.nutrition, item.imageUrl))
         }
     }
     suspend fun delete(item: Purchase) = db.purchases().delete(item)
     suspend fun findKnown(barcode: String) = db.knownProducts().find(barcode)
     suspend fun rememberProduct(p: KnownProduct) = db.knownProducts().upsert(p)
+
+    /** Adds online photos to saved purchases that don't have one yet (runs quietly; needs internet). */
+    suspend fun backfillPhotos() {
+        val dao = db.purchases()
+        for (code in dao.barcodesWithoutPhoto()) {
+            val url = db.knownProducts().find(code)?.imageUrl ?: ProductLookup.fetch(code)?.imageUrl ?: continue
+            dao.setPhotoByBarcode(code, url)
+        }
+        for (name in dao.namesWithoutPhoto()) {
+            val url = ProductLookup.searchImage(name) ?: continue
+            dao.setPhotoByName(name, url)
+        }
+    }
+
+    /** Looks up a photo for one manually added or renamed purchase. */
+    suspend fun fillPhoto(name: String) {
+        ProductLookup.searchImage(name)?.let { db.purchases().setPhotoByName(name, it) }
+    }
 
     companion object {
         @Volatile private var instance: Repository? = null

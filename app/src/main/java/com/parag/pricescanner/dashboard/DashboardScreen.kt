@@ -240,7 +240,9 @@ private fun TopProductsCard(s: DashboardState) {
             s.topProducts.forEachIndexed { i, p ->
                 Column(Modifier.padding(vertical = 8.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(
+                        if (p.imageUrl != null) {
+                            com.parag.pricescanner.ui.components.ProductThumb(p.imageUrl, p.name, size = 36.dp)
+                        } else Box(
                             Modifier.size(26.dp).background(rankColors[i % rankColors.size].copy(alpha = 0.15f), CircleShape),
                             contentAlignment = Alignment.Center,
                         ) { Text("${i + 1}", color = rankColors[i % rankColors.size], fontWeight = FontWeight.Bold, fontSize = 12.sp) }
@@ -277,7 +279,8 @@ private fun ExpiringCard(items: List<Purchase>) {
             items.forEach { p ->
                 val exp = Fmt.epochDay(p.expiryDate) ?: return@forEach
                 Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconBadge(Icons.Rounded.EventBusy, if (Fmt.daysLeft(exp) < 0) Rose else Amber, size = 36.dp)
+                    if (p.imageUrl != null) com.parag.pricescanner.ui.components.ProductThumb(p.imageUrl, p.productName, size = 40.dp)
+                    else IconBadge(Icons.Rounded.EventBusy, if (Fmt.daysLeft(exp) < 0) Rose else Amber, size = 36.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(p.productName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -298,7 +301,7 @@ private fun RecentCard(recent: List<Purchase>) {
             Spacer(Modifier.height(6.dp))
             recent.forEach { p ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    IconBadge(Icons.Rounded.ShoppingBag, MaterialTheme.colorScheme.primary, size = 36.dp)
+                    com.parag.pricescanner.ui.components.ProductThumb(p.imageUrl, p.productName, size = 44.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(p.productName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)

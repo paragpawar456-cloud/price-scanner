@@ -10,6 +10,7 @@ An Android app that opens straight to a camera scanner, reads a product's price 
 - **One pack = one item**: everything read while a pack is in view (price, barcode, name, dates, nutrition) goes to the same item and it is counted once. Take the pack out of view before showing the next one.
 - **Product names and nutrition from the barcode**: barcodes are looked up on Open Food Facts (free, needs internet the first time; the result is remembered offline).
 - **Nutrition from the pack**: turn the pack to its nutrition table and the app reads energy, fat, saturated fat, trans fat, sugar, added sugar, carbs, protein, fibre and sodium (per 100 g), with green / amber / red levels and "High sugar"-style warnings in the bill and records.
+- **Product photos**: each scanned item gets a product photo from Open Food Facts (by barcode, or by product name when there is no barcode), shown in the scanner, bill, records and dashboard. Older records get photos filled in automatically when online.
 - **Hindi names**: reads Devanagari product names (e.g. आम का अचार) when there is no English name.
 - **Auto count**: show each packet to the camera one after another. Every new packet is counted (5 packets of Maggi = qty 5), with a beep and vibration. Holding one packet still never counts twice.
 - **Manual mode**: tap Capture, then type or step the quantity yourself. You can also add any item by hand.

@@ -20,6 +20,18 @@ interface PurchaseDao {
     @Query("SELECT DISTINCT productName FROM purchases ORDER BY productName")
     fun observeProductNames(): Flow<List<String>>
 
+    @Query("SELECT DISTINCT productName FROM purchases WHERE imageUrl IS NULL AND barcode IS NULL LIMIT 30")
+    suspend fun namesWithoutPhoto(): List<String>
+
+    @Query("SELECT DISTINCT barcode FROM purchases WHERE imageUrl IS NULL AND barcode IS NOT NULL LIMIT 30")
+    suspend fun barcodesWithoutPhoto(): List<String>
+
+    @Query("UPDATE purchases SET imageUrl = :url WHERE productName = :name AND imageUrl IS NULL")
+    suspend fun setPhotoByName(name: String, url: String)
+
+    @Query("UPDATE purchases SET imageUrl = :url WHERE barcode = :barcode AND imageUrl IS NULL")
+    suspend fun setPhotoByBarcode(barcode: String, url: String)
+
     @Insert
     suspend fun insertAll(items: List<Purchase>)
 

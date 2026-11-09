@@ -28,6 +28,7 @@ data class CartItem(
     val nutrition: Nutrition? = null,
     /** True once the name came from the user or a trusted source, so scanning stops changing it. */
     val nameLocked: Boolean = false,
+    val imageUrl: String? = null,
 ) {
     val total get() = price * qty
     val needsPrice get() = price <= 0.0
@@ -43,6 +44,7 @@ data class Detection(
     val mfgDate: LocalDate? = null,
     val expiryDate: LocalDate? = null,
     val nutrition: Nutrition? = null,
+    val imageUrl: String? = null,
 ) {
     val displayName: String? get() = knownName ?: name
 }
@@ -95,6 +97,7 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
         if (_state.value.paused) return
         val snap = tracker.onFrame(frame, System.currentTimeMillis())
         if (snap == null) {
+            sessionLine?.let { ensurePhoto(it.second) }
             sessionLine = null
             _state.update { it.copy(detection = null) }
             return
@@ -111,6 +114,7 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
             mfgDate = snap.mfgDate,
             expiryDate = snap.expiryDate,
             nutrition = (snap.nutrition ?: Nutrition()).merge(Nutrition.decode(kp?.nutrition)).takeIf { !it.isEmpty },
+            imageUrl = kp?.imageUrl,
         )
         val showable = snap.identified || detection.nutrition != null || detection.mfgDate != null || detection.expiryDate != null
         _state.update { s -> s.copy(detection = detection.takeIf { showable }) }
@@ -118,6 +122,7 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
         if (!_state.value.autoMode) return
         val line = sessionLine
         if (snap.countNow) {
+            sessionLine?.let { ensurePhoto(it.second) }
             val id = addScanned(detection, auto = true)
             sessionLine = snap.sessionId to id.first
             sessionCreatedLine = id.second
@@ -137,8 +142,36 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                 mfgDate = item.mfgDate ?: d.mfgDate,
                 expiryDate = item.expiryDate ?: d.expiryDate,
                 nutrition = (d.nutrition ?: Nutrition()).merge(item.nutrition).takeIf { !it.isEmpty },
+                imageUrl = item.imageUrl ?: d.imageUrl,
             )
         })
+    }
+
+    private val photoByName = mutableMapOf<String, String?>()
+    private val photoInFlight = mutableSetOf<String>()
+    private val lookupDone = mutableSetOf<String>()
+
+    /** For lines without a barcode photo: look one up online by product name. */
+    private fun ensurePhoto(lineId: String) {
+        val item = _state.value.cart.firstOrNull { it.id == lineId } ?: return
+        if (item.imageUrl != null) return
+        if (item.barcode != null && item.barcode !in lookupDone) return // barcode lookup still running
+        val key = item.name.trim().lowercase()
+        if (photoByName.containsKey(key)) {
+            photoByName[key]?.let { url -> setPhoto(item.name, url) }
+            return
+        }
+        if (!photoInFlight.add(key)) return
+        viewModelScope.launch {
+            val url = ProductLookup.searchImage(item.name)
+            photoByName[key] = url
+            photoInFlight.remove(key)
+            url?.let { setPhoto(item.name, it) }
+        }
+    }
+
+    private fun setPhoto(name: String, url: String) = _state.update { s ->
+        s.copy(cart = s.cart.map { if (it.name == name && it.imageUrl == null) it.copy(imageUrl = url) else it })
     }
 
     private fun lookup(barcode: String) {
@@ -146,19 +179,24 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val local = repo.findKnown(barcode)
             if (local != null) known[barcode] = local
-            if (local == null || local.nutrition == null) {
+            if (local == null || local.nutrition == null || local.imageUrl == null) {
                 ProductLookup.fetch(barcode)?.let { online ->
                     val merged = KnownProduct(
                         barcode = barcode,
                         name = local?.name ?: online.name,
                         lastPrice = local?.lastPrice ?: 0.0,
                         nutrition = online.nutrition?.encode() ?: local?.nutrition,
+                        imageUrl = online.imageUrl ?: local?.imageUrl,
                     )
                     known[barcode] = merged
                     repo.rememberProduct(merged)
                 }
             }
-            known[barcode]?.let { kp -> applyKnown(kp) }
+            val kp = known[barcode]
+            lookupDone += barcode
+            if (kp != null) applyKnown(kp)
+            // No photo for this barcode online: fall back to a search by name.
+            if (kp?.imageUrl == null) _state.value.cart.filter { it.barcode == barcode }.forEach { ensurePhoto(it.id) }
         }
     }
 
@@ -170,6 +208,7 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                 nameLocked = true,
                 price = if (item.needsPrice && kp.lastPrice > 0) kp.lastPrice else item.price,
                 nutrition = (item.nutrition ?: Nutrition()).merge(Nutrition.decode(kp.nutrition)).takeIf { !it.isEmpty },
+                imageUrl = item.imageUrl ?: kp.imageUrl,
             )
         })
     }
@@ -194,13 +233,14 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                     mfgDate = cart[idx].mfgDate ?: d.mfgDate,
                     expiryDate = cart[idx].expiryDate ?: d.expiryDate,
                     nutrition = (cart[idx].nutrition ?: Nutrition()).merge(d.nutrition).takeIf { !it.isEmpty },
+                    imageUrl = cart[idx].imageUrl ?: d.imageUrl,
                 ).also { cart[idx] = it; result = it.id to false }
             } else {
                 val name = d.displayName ?: if (price > 0) "Item ₹${Fmt.price(price)}" else "New item"
                 CartItem(
                     name = name, price = price, qty = 1, barcode = d.barcode, auto = auto,
                     mfgDate = d.mfgDate, expiryDate = d.expiryDate, nutrition = d.nutrition,
-                    nameLocked = d.knownName != null,
+                    nameLocked = d.knownName != null, imageUrl = d.imageUrl,
                 ).also { cart.add(0, it); result = it.id to true }
             }
             s.copy(cart = cart, lastCount = CountEvent(++eventSeq, line.name, line.qty))
@@ -212,6 +252,7 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
     fun addManual(
         name: String, price: Double, qty: Int, barcode: String?,
         mfgDate: LocalDate? = null, expiryDate: LocalDate? = null, nutrition: Nutrition? = null,
+        imageUrl: String? = null,
     ) {
         if (qty <= 0) return
         _state.update { s ->
@@ -225,16 +266,19 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                 mfgDate = mfgDate ?: cart[idx].mfgDate,
                 expiryDate = expiryDate ?: cart[idx].expiryDate,
                 nutrition = (nutrition ?: Nutrition()).merge(cart[idx].nutrition).takeIf { !it.isEmpty },
+                imageUrl = cart[idx].imageUrl ?: imageUrl,
             )
             else cart.add(
                 0,
                 CartItem(
                     name = name.ifBlank { "Item" }, price = price, qty = qty, barcode = barcode,
                     mfgDate = mfgDate, expiryDate = expiryDate, nutrition = nutrition, nameLocked = true,
+                    imageUrl = imageUrl,
                 ),
             )
             s.copy(cart = cart, lastCount = CountEvent(++eventSeq, name, qty))
         }
+        _state.value.cart.filter { it.name == name && it.imageUrl == null }.forEach { ensurePhoto(it.id) }
     }
 
     /** Count one more of whatever the camera currently sees (works in either mode). */
@@ -242,8 +286,16 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
         _state.value.detection?.let { addScanned(it, auto = _state.value.autoMode) }
     }
 
-    fun updateItem(item: CartItem) = _state.update { s ->
-        s.copy(cart = s.cart.map { if (it.id == item.id) item.copy(nameLocked = true) else it }.filter { it.qty > 0 })
+    fun updateItem(item: CartItem) {
+        val old = _state.value.cart.firstOrNull { it.id == item.id }
+        // A renamed item without a barcode photo gets a fresh photo search.
+        val renamed = old != null && old.name != item.name && item.barcode == null
+        _state.update { s ->
+            s.copy(cart = s.cart.map {
+                if (it.id == item.id) item.copy(nameLocked = true, imageUrl = if (renamed) null else item.imageUrl) else it
+            }.filter { it.qty > 0 })
+        }
+        if (renamed || item.imageUrl == null) ensurePhoto(item.id)
     }
 
     fun changeQty(id: String, delta: Int) = _state.update { s ->
@@ -269,10 +321,11 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                     mfgDate = it.mfgDate?.toEpochDay(),
                     expiryDate = it.expiryDate?.toEpochDay(),
                     nutrition = it.nutrition?.encode(),
+                    imageUrl = it.imageUrl,
                 )
             })
             items.forEach { i ->
-                i.barcode?.let { known[it] = KnownProduct(it, i.name, i.price, i.nutrition?.encode()) }
+                i.barcode?.let { known[it] = KnownProduct(it, i.name, i.price, i.nutrition?.encode(), i.imageUrl) }
             }
             tracker.reset()
             sessionLine = null

@@ -13,14 +13,14 @@ import java.net.URL
  */
 object ProductLookup {
 
-    data class Info(val name: String, val nutrition: Nutrition?)
+    data class Info(val name: String, val nutrition: Nutrition?, val imageUrl: String?)
 
     suspend fun fetch(barcode: String): Info? = withContext(Dispatchers.IO) {
         if (!barcode.all { it.isDigit() } || barcode.length !in 8..14) return@withContext null
         runCatching {
             val url = URL(
                 "https://world.openfoodfacts.org/api/v2/product/$barcode.json" +
-                    "?fields=product_name,product_name_en,brands,quantity,nutriments"
+                    "?fields=product_name,product_name_en,brands,quantity,nutriments,image_front_small_url,image_front_url,image_url"
             )
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 6000
@@ -32,6 +32,48 @@ object ProductLookup {
                 val root = JSONObject(conn.inputStream.bufferedReader().use { it.readText() })
                 if (root.optInt("status") != 1) return@runCatching null
                 parse(root.getJSONObject("product"))
+            } finally {
+                conn.disconnect()
+            }
+        }.getOrNull()
+    }
+
+    private fun imageOf(p: JSONObject): String? =
+        listOf("image_front_url", "image_front_small_url", "image_url")
+            .map { p.optString(it) }.firstOrNull { it.startsWith("https://") }
+
+    /**
+     * Finds a photo by product name, for packs without a barcode.
+     * Returns null when nothing close enough is found.
+     */
+    suspend fun searchImage(name: String): String? = withContext(Dispatchers.IO) {
+        val query = name.trim()
+        if (query.count { it.isLetter() } < 4 || query.startsWith("Item ₹") || query == "New item") return@withContext null
+        runCatching {
+            val url = URL(
+                "https://world.openfoodfacts.org/cgi/search.pl?action=process&json=1&search_simple=1&page_size=8" +
+                    "&fields=product_name,brands,image_front_url,image_front_small_url,image_url" +
+                    "&search_terms=" + java.net.URLEncoder.encode(query, "UTF-8")
+            )
+            val conn = (url.openConnection() as HttpURLConnection).apply {
+                connectTimeout = 6000
+                readTimeout = 10000
+                setRequestProperty("User-Agent", "PriceScan-Android/1.3")
+            }
+            try {
+                if (conn.responseCode != 200) return@runCatching null
+                val products = JSONObject(conn.inputStream.bufferedReader().use { it.readText() }).optJSONArray("products")
+                    ?: return@runCatching null
+                val words = query.lowercase().split(Regex("""\s+""")).filter { it.length >= 3 }
+                // Prefer a result whose name/brand shares the most words with ours.
+                (0 until products.length()).map { products.getJSONObject(it) }
+                    .mapNotNull { p ->
+                        val img = imageOf(p) ?: return@mapNotNull null
+                        val text = (p.optString("product_name") + " " + p.optString("brands")).lowercase()
+                        val hits = words.count { text.contains(it) }
+                        if (hits == 0) null else hits to img
+                    }
+                    .maxByOrNull { it.first }?.second
             } finally {
                 conn.disconnect()
             }
@@ -64,6 +106,6 @@ object ProductLookup {
             sodiumMg = sodiumMg,
             fiber = d("fiber_100g"),
         ).takeIf { !it.isEmpty }
-        return Info(name, nutrition)
+        return Info(name, nutrition, imageOf(p))
     }
 }

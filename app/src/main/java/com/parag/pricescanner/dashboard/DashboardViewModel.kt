@@ -20,7 +20,7 @@ import java.time.temporal.TemporalAdjusters
 enum class ChartRange(val label: String) { WEEK("7 days"), MONTH("30 days"), YEAR("12 months") }
 
 data class Bar(val label: String, val value: Double, val detail: String)
-data class ProductStat(val name: String, val qty: Int, val spend: Double)
+data class ProductStat(val name: String, val qty: Int, val spend: Double, val imageUrl: String? = null)
 
 data class DashboardState(
     val loading: Boolean = true,
@@ -87,7 +87,7 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
 
         val inRange = all.filter { !Fmt.date(it.timestamp).isBefore(rangeStart) }
         val top = inRange.groupBy { it.productName.trim().lowercase() }
-            .map { (_, list) -> ProductStat(list.first().productName, list.sumOf { it.quantity }, list.sumOf { it.total }) }
+            .map { (_, list) -> ProductStat(list.first().productName, list.sumOf { it.quantity }, list.sumOf { it.total }, list.firstNotNullOfOrNull { it.imageUrl }) }
             .sortedByDescending { it.spend }
             .take(5)
 

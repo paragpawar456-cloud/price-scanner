@@ -195,7 +195,7 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
                 }
                 items(g.items, key = { it.id }) { p ->
                     PurchaseRow(p, onClick = { editing = p })
-                    HorizontalDivider(Modifier.padding(start = 72.dp, end = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    HorizontalDivider(Modifier.padding(start = 78.dp, end = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
                 }
             }
         }
@@ -222,6 +222,7 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
                 Fmt.epochDay(p.mfgDate), Fmt.epochDay(p.expiryDate),
             ),
             nutrition = com.parag.pricescanner.scan.Nutrition.decode(p.nutrition),
+            imageUrl = p.imageUrl,
             nameSuggestions = names,
             showDate = true,
             onDismiss = { editing = null },
@@ -311,16 +312,7 @@ private fun PurchaseRow(p: Purchase, onClick: () -> Unit) {
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            Modifier.size(42.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                p.productName.take(1).uppercase(),
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.primary,
-            )
-        }
+        com.parag.pricescanner.ui.components.ProductThumb(p.imageUrl, p.productName, size = 48.dp)
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
