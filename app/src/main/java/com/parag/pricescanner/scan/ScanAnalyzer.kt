@@ -14,19 +14,6 @@ import com.google.mlkit.vision.text.Text
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.devanagari.DevanagariTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
-import java.time.LocalDate
-
-/** What the camera saw in a single frame. */
-data class FrameResult(
-    val prices: List<PriceParser.Candidate>,
-    val nameGuess: String?,
-    val barcode: String?,
-    val mfgDate: LocalDate? = null,
-    val expiryDate: LocalDate? = null,
-) {
-    val bestPrice: Double? get() = prices.firstOrNull()?.value
-    val isEmpty: Boolean get() = prices.isEmpty() && barcode == null
-}
 
 /**
  * Runs on-device text recognition (English every frame, Hindi/Devanagari every few
@@ -80,7 +67,8 @@ class ScanAnalyzer(
                 val name = NameGuesser.guess(nameLines) ?: lastHindiName
 
                 val barcode = codes.firstOrNull { !it.rawValue.isNullOrBlank() }?.rawValue
-                onResult(FrameResult(label.prices, name, barcode, label.mfgDate, label.expiryDate))
+                val nutrition = NutritionParser.parse(lines).takeIf { !it.isEmpty }
+                onResult(FrameResult(label.prices, name, barcode, label.mfgDate, label.expiryDate, nutrition))
             } finally {
                 imageProxy.close()
             }

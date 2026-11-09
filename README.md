@@ -7,6 +7,9 @@ An Android app that opens straight to a camera scanner, reads a product's price 
 - **Scanner first**: the app opens on the camera. It reads the printed MRP / ₹ / Rs price with on-device text recognition, and the barcode if there is one. No barcode is needed. Nothing leaves the phone.
 - **Reads label layouts**: prices printed under an "MRP ↓" heading (with USP and batch number columns beside it) are matched to the right heading, so the unit price or batch number is not mistaken for the MRP.
 - **Mfg and expiry dates**: reads packaging / manufacture and use-by / expiry / best-before dates in common formats (12 SEP 26, 11JUN.27, 08/2026, 15-03-2026, "best before 9 months"). Saved with each purchase, editable, shown in records and the PDF, and the dashboard warns about items expiring soon.
+- **One pack = one item**: everything read while a pack is in view (price, barcode, name, dates, nutrition) goes to the same item and it is counted once. Take the pack out of view before showing the next one.
+- **Product names and nutrition from the barcode**: barcodes are looked up on Open Food Facts (free, needs internet the first time; the result is remembered offline).
+- **Nutrition from the pack**: turn the pack to its nutrition table and the app reads energy, fat, saturated fat, trans fat, sugar, added sugar, carbs, protein, fibre and sodium (per 100 g), with green / amber / red levels and "High sugar"-style warnings in the bill and records.
 - **Hindi names**: reads Devanagari product names (e.g. आम का अचार) when there is no English name.
 - **Auto count**: show each packet to the camera one after another. Every new packet is counted (5 packets of Maggi = qty 5), with a beep and vibration. Holding one packet still never counts twice.
 - **Manual mode**: tap Capture, then type or step the quantity yourself. You can also add any item by hand.

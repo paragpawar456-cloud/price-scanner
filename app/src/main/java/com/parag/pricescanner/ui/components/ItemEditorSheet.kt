@@ -72,6 +72,7 @@ fun ItemEditorSheet(
     nameSuggestions: List<String> = emptyList(),
     showDate: Boolean = false,
     onDelete: (() -> Unit)? = null,
+    nutrition: com.parag.pricescanner.scan.Nutrition? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var name by remember { mutableStateOf(initial.name) }
@@ -164,6 +165,11 @@ fun ItemEditorSheet(
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 DateField("Mfg / packed", mfg, { pickFor = PickFor.MFG }, { mfg = null }, Modifier.weight(1f))
                 DateField("Expiry / use by", exp, { pickFor = PickFor.EXPIRY }, { exp = null }, Modifier.weight(1f))
+            }
+
+            if (nutrition != null && !nutrition.isEmpty) {
+                Spacer(Modifier.height(12.dp))
+                NutritionCard(nutrition)
             }
 
             Spacer(Modifier.height(16.dp))

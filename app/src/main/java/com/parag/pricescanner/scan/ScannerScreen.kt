@@ -151,7 +151,11 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
                 DisposableEffect(analyzer) { onDispose { analyzer.close() } }
                 CameraPreview(analyzer = analyzer, torchOn = state.torchOn, modifier = Modifier.fillMaxSize())
                 ScanOverlay(active = state.detection != null, modifier = Modifier.fillMaxSize())
-                DetectionBubble(state.detection, Modifier.align(Alignment.Center).offset(y = (-120).dp))
+                DetectionBubble(
+                    state.detection,
+                    Modifier.align(Alignment.Center).offset(y = (-120).dp),
+                    onClick = { capture = state.detection; captureOpen = true },
+                )
             } else {
                 PermissionPrompt { launcher.launch(Manifest.permission.CAMERA) }
             }
@@ -196,11 +200,12 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
                 mfgDate = d?.mfgDate, expiryDate = d?.expiryDate,
             ),
             priceSuggestions = d?.alternatives.orEmpty(),
+            nutrition = d?.nutrition,
             nameSuggestions = names,
             confirmLabel = "Add to list",
             onDismiss = { captureOpen = false },
             onSave = { draft ->
-                vm.addManual(draft.name, draft.price ?: 0.0, draft.qty, d?.barcode, draft.mfgDate, draft.expiryDate)
+                vm.addManual(draft.name, draft.price ?: 0.0, draft.qty, d?.barcode, draft.mfgDate, draft.expiryDate, d?.nutrition)
                 captureOpen = false
             },
         )
@@ -209,6 +214,7 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
         ItemEditorSheet(
             title = "Edit item",
             initial = ItemDraft(item.name, item.price, item.qty, mfgDate = item.mfgDate, expiryDate = item.expiryDate),
+            nutrition = item.nutrition,
             nameSuggestions = names,
             onDismiss = { editing = null },
             onSave = { draft ->
@@ -297,10 +303,10 @@ private fun ScanOverlay(active: Boolean, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun DetectionBubble(d: Detection?, modifier: Modifier = Modifier) {
+private fun DetectionBubble(d: Detection?, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
     AnimatedVisibility(visible = d != null, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
         if (d == null) return@AnimatedVisibility
-        Surface(shape = RoundedCornerShape(20.dp), color = Color.Black.copy(alpha = 0.7f), contentColor = Color.White) {
+        Surface(onClick = onClick, shape = RoundedCornerShape(20.dp), color = Color.Black.copy(alpha = 0.7f), contentColor = Color.White) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (d.barcode != null) {
                     Icon(Icons.Rounded.QrCode2, null, tint = Mint, modifier = Modifier.size(20.dp))
@@ -324,6 +330,20 @@ private fun DetectionBubble(d: Detection?, modifier: Modifier = Modifier) {
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFFFDE68A),
                         )
+                    }
+                    d.nutrition?.let { n ->
+                        val bits = listOfNotNull(
+                            n.sugar?.let { "Sugar ${com.parag.pricescanner.scan.Nutrition.fmt(it)}g" },
+                            n.saturatedFat?.let { "Sat fat ${com.parag.pricescanner.scan.Nutrition.fmt(it)}g" },
+                            n.transFat?.let { "Trans ${com.parag.pricescanner.scan.Nutrition.fmt(it)}g" },
+                        ).ifEmpty { listOfNotNull(n.energyKcal?.let { "${com.parag.pricescanner.scan.Nutrition.fmt(it)} kcal" }) }
+                        if (bits.isNotEmpty()) {
+                            Text(
+                                bits.joinToString(" · ") + "  ›",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = if (n.warnings().isNotEmpty()) Color(0xFFFDA4AF) else Color(0xFFA7F3D0),
+                            )
+                        }
                     }
                 }
             }
@@ -401,7 +421,7 @@ private fun BottomPanel(
                     )
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        if (state.autoMode) "Point the camera at the price label (MRP). No barcode needed. Each packet you show is counted, and mfg / expiry dates are read too."
+                        if (state.autoMode) "Hold each packet in view until it beeps, then take it away before showing the next one. Price, barcode, dates and the nutrition table (turn the pack) are all added to the same item."
                         else "Point at the MRP or barcode and tap Capture, then set the quantity yourself.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -509,7 +529,10 @@ private fun CartRow(item: CartItem, onClick: () -> Unit, onQty: (Int) -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
-                item.expiryDate?.let { ExpiryTag(it) }
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    item.expiryDate?.let { ExpiryTag(it) }
+                    item.nutrition?.warnings()?.firstOrNull()?.let { com.parag.pricescanner.ui.components.WarningPill(it) }
+                }
             }
         }
         QuantityStepper(qty = item.qty, onChange = onQty, compact = true)

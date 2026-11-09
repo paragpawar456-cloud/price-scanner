@@ -221,6 +221,7 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
                 p.productName, p.unitPrice, p.quantity, Fmt.date(p.timestamp),
                 Fmt.epochDay(p.mfgDate), Fmt.epochDay(p.expiryDate),
             ),
+            nutrition = com.parag.pricescanner.scan.Nutrition.decode(p.nutrition),
             nameSuggestions = names,
             showDate = true,
             onDismiss = { editing = null },
@@ -343,6 +344,11 @@ private fun PurchaseRow(p: Purchase, onClick: () -> Unit) {
                         if (exp != null) Text("  ·  ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     exp?.let { com.parag.pricescanner.scan.ExpiryTag(it) }
+                }
+            }
+            com.parag.pricescanner.scan.Nutrition.decode(p.nutrition)?.warnings()?.takeIf { it.isNotEmpty() }?.let { w ->
+                Row(Modifier.padding(top = 3.dp), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    w.take(3).forEach { com.parag.pricescanner.ui.components.WarningPill(it) }
                 }
             }
         }

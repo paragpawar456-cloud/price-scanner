@@ -19,6 +19,8 @@ data class Purchase(
     val mfgDate: Long? = null,
     /** Expiry / use-by / best-before date as epoch day. */
     val expiryDate: Long? = null,
+    /** Nutrition per 100 g, encoded by Nutrition.encode(). */
+    val nutrition: String? = null,
 ) {
     val total: Double get() = unitPrice * quantity
 
@@ -34,4 +36,5 @@ data class KnownProduct(
     @PrimaryKey val barcode: String,
     val name: String,
     val lastPrice: Double,
+    val nutrition: String? = null,
 )
