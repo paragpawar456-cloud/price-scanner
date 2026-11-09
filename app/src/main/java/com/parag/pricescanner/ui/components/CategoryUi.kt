@@ -92,8 +92,8 @@ fun CategoryPicker(selected: Category?, onSelect: (Category) -> Unit, modifier: 
                 selected = selected == c,
                 onClick = { onSelect(c) },
                 label = { Text(c.label) },
-                leadingIcon = { Icon(c.icon, null, Modifier.size(18.dp), tint = if (selected == c) c else MaterialTheme.colorScheme.onSurfaceVariant) },
-                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = c.copy(alpha = 0.16f)),
+                leadingIcon = { Icon(c.icon, null, Modifier.size(18.dp), tint = if (selected == c) c.color else MaterialTheme.colorScheme.onSurfaceVariant) },
+                colors = FilterChipDefaults.filterChipColors(selectedContainerColor = c.color.copy(alpha = 0.16f)),
             )
         }
     }
