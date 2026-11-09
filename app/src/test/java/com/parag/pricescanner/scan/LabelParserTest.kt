@@ -87,4 +87,42 @@ class LabelParserTest {
         assertEquals(listOf(LocalDate.of(2026, 1, 1)), LabelParser.findDates("JAN 2026"))
         assertEquals(listOf(LocalDate.of(2026, 3, 15)), LabelParser.findDates("15-03-26"))
     }
+
+    // Magnum seal strip: price, unit price, mfg, expiry on one printed line; "MFD.: / USE BY:" headings
+    // elsewhere on the pack just say "Please refer the seal area".
+    private fun magnum(seal: String) = listOf(
+        line(140, 830, seal, h = 30, charW = 14),
+        line(395, 925, "MFD.:", h = 16, charW = 8),
+        line(395, 945, "USE", "BY:", h = 16, charW = 8),
+        line(395, 965, "BATCH", "No.", h = 16, charW = 8),
+        line(545, 930, "Please", "refer", "the", "seal", "area.", h = 16, charW = 8),
+    )
+
+    @Test fun magnumSealCommas() {
+        val r = LabelParser.parse(magnum("₹80/-,₹1.29/g,28/01/26,22/07/27 A28B 18:17 L15"), today)
+        assertEquals(80.0, r.prices.first().value, 0.0)
+        assertEquals(LocalDate.of(2026, 1, 28), r.mfgDate)
+        assertEquals(LocalDate.of(2027, 7, 22), r.expiryDate)
+    }
+
+    @Test fun magnumSealOcrDots() {
+        // OCR often turns commas into dots and "g" into "9"
+        val r = LabelParser.parse(magnum("₹80/-.₹1.29/9.28/01/26.22/07/27 A28B 18:17 L15"), today)
+        assertEquals(LocalDate.of(2026, 1, 28), r.mfgDate)
+        assertEquals(LocalDate.of(2027, 7, 22), r.expiryDate)
+    }
+
+    @Test fun magnumSealSplitIntoSeparateLines() {
+        // OCR may return each date as its own line, in any order, with "MFD.:" just below
+        val lines = listOf(
+            line(560, 830, "22/07/27", h = 30, charW = 14),
+            line(140, 830, "₹80/-,₹1.29/g,", h = 30, charW = 14),
+            line(420, 830, "28/01/26,", h = 30, charW = 14),
+            line(395, 925, "MFD.:", h = 16, charW = 8),
+            line(395, 945, "USE", "BY:", h = 16, charW = 8),
+        )
+        val r = LabelParser.parse(lines, today)
+        assertEquals(LocalDate.of(2026, 1, 28), r.mfgDate)
+        assertEquals(LocalDate.of(2027, 7, 22), r.expiryDate)
+    }
 }

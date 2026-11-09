@@ -63,8 +63,8 @@ object LabelParser {
     private const val SEP = """\s*[.\-/'’,]?\s*"""
     private val dMonY = Regex("""\b(\d{1,2})$SEP$MON\.?$SEP(\d{4}|\d{2})\b""", RegexOption.IGNORE_CASE)
     private val monY = Regex("""\b$MON\.?$SEP(\d{4}|\d{2})\b""", RegexOption.IGNORE_CASE)
-    private val dmy = Regex("""\b(\d{1,2})\s*[./\-]\s*(\d{1,2})\s*[./\-]\s*(\d{4}|\d{2})\b""")
-    private val my = Regex("""\b(\d{1,2})\s*[./\-]\s*(\d{4})\b|\b(\d{2})\s*/\s*(\d{2})\b""")
+    private val dmy = Regex("""(?<!\d)(\d{1,2})\s?([./\-])\s?(\d{1,2})\s?\2\s?(\d{4}|\d{2})(?!\d)""")
+    private val my = Regex("""(?<![\d./])(\d{1,2})\s*[./\-]\s*(\d{4})(?![\d./])|(?<![\d./])(\d{2})\s*/\s*(\d{2})(?![\d./])""")
     private val bestBeforeMonths = Regex("""BEST\s*BEFORE\s*(\d{1,2})\s*MONTHS?|(?:USE|CONSUME)\s*WITHIN\s*(\d{1,2})\s*MONTHS?|EXPIRES?\s*(?:IN|WITHIN)\s*(\d{1,2})\s*MONTHS?""", RegexOption.IGNORE_CASE)
 
     private data class DateHit(val date: LocalDate, val start: Int, val end: Int, val monthOnly: Boolean = false)
@@ -84,8 +84,8 @@ object LabelParser {
         }
         for (m in dmy.findAll(text)) {
             if (!free(m.range)) continue
-            val d = m.groupValues[1].toInt(); val mo = m.groupValues[2].toInt()
-            val y = year(m.groupValues[3]) ?: continue
+            val d = m.groupValues[1].toInt(); val mo = m.groupValues[3].toInt()
+            val y = year(m.groupValues[4]) ?: continue
             safeDate(y, mo, d)?.let { hits += DateHit(it, m.range.first, m.range.last + 1) }
         }
         for (m in monY.findAll(text)) {
@@ -196,6 +196,16 @@ object LabelParser {
 
         for (line in lines) {
             val hits = findDateHits(line.text)
+            // Several dates printed together (seal strips: "28/01/26,22/07/27") with no MFG/EXP words
+            // between them are in packing -> expiry order; don't let a heading elsewhere claim them all.
+            val inlineWords = hits.any { h ->
+                lastHead(line.text.substring(0, h.start).takeLast(28)) != null
+            }
+            if (hits.size >= 2 && !inlineWords) {
+                hits.forEach { if (it.monthOnly) monthOnly += it.date }
+                unlabeled += hits.map { it.date }
+                continue
+            }
             for (hit in hits) {
                 if (hit.monthOnly) monthOnly += hit.date
                 // 1) keyword just before the date on the same line: "EXP 11/27", "Best before 06.2026"
@@ -204,9 +214,9 @@ object LabelParser {
                 val inline = lastHead(before) ?: firstHead(after)
                 // 2) otherwise the heading printed above or below it (labels with ↓ / ↑ arrows)
                 val kind = inline ?: nearestDateHead(line.box, heads)
-                when (kind) {
-                    Head.MFG -> if (mfg == null) mfg = hit.date
-                    Head.EXPIRY -> if (exp == null) exp = hit.date
+                when {
+                    kind == Head.MFG && mfg == null -> mfg = hit.date
+                    kind == Head.EXPIRY && exp == null -> exp = hit.date
                     else -> unlabeled += hit.date
                 }
             }
@@ -214,7 +224,7 @@ object LabelParser {
 
         // Unlabelled dates: earliest is manufacture/packing, latest is expiry.
         val pool = (unlabeled + listOfNotNull(mfg, exp)).distinct().sorted()
-        if (mfg == null && exp == null && pool.size >= 2) {
+        if ((mfg == null || exp == null) && pool.size >= 2) {
             mfg = pool.first(); exp = pool.last()
         } else if (unlabeled.isNotEmpty()) {
             if (mfg == null) mfg = unlabeled.filter { exp == null || it < exp!! }.minOrNull()?.takeIf { !it.isAfter(today) }
