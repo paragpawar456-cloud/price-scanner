@@ -1,5 +1,6 @@
 package com.parag.pricescanner.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -100,12 +101,21 @@ fun ItemEditorSheet(
                 .navigationBarsPadding()
                 .imePadding(),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                if (imageUrl != null) {
-                    ProductThumb(imageUrl, initial.name, size = 72.dp)
-                    Spacer(Modifier.width(14.dp))
+            if (imageUrl != null) {
+                androidx.compose.foundation.layout.Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(190.dp)
+                        .background(MaterialTheme.colorScheme.surfaceContainer, androidx.compose.foundation.shape.RoundedCornerShape(24.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    ProductThumb(imageUrl, initial.name, size = 160.dp, background = MaterialTheme.colorScheme.surfaceContainer)
                 }
-                Text(title, style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(14.dp))
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(title, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
+                category?.let { CategoryChip(it) }
             }
             Spacer(Modifier.height(16.dp))
 
@@ -213,8 +223,9 @@ fun ItemEditorSheet(
             Button(
                 onClick = { onSave(ItemDraft(name.trim(), price, qty, if (showDate) date else null, mfg, exp, category)) },
                 enabled = valid,
-                modifier = Modifier.fillMaxWidth().height(52.dp),
-            ) { Text(confirmLabel) }
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = androidx.compose.foundation.shape.CircleShape,
+            ) { Text(confirmLabel, style = MaterialTheme.typography.titleSmall) }
             Spacer(Modifier.height(16.dp))
         }
     }

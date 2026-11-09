@@ -2,11 +2,20 @@
 
 package com.parag.pricescanner.history
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.FilterChipDefaults
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.sp
+import com.parag.pricescanner.ui.components.color
+import com.parag.pricescanner.ui.components.icon
+import com.parag.pricescanner.ui.components.enterUp
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -106,31 +115,43 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
     }
 
     Scaffold(
-        snackbarHost = { SnackbarHost(snackbar) },
+        snackbarHost = { SnackbarHost(snackbar, Modifier.padding(bottom = com.parag.pricescanner.LocalNavPadding.current)) },
         contentWindowInsets = androidx.compose.foundation.layout.WindowInsets(0),
-        floatingActionButton = {
-            ExtendedFloatingActionButton(
-                onClick = { adding = true },
-                icon = { Icon(Icons.Rounded.Add, null) },
-                text = { Text("Add entry") },
-            )
-        },
+        containerColor = MaterialTheme.colorScheme.background,
     ) { inner ->
         LazyColumn(
             Modifier.fillMaxSize().padding(inner).statusBarsPadding(),
-            contentPadding = PaddingValues(bottom = 96.dp),
+            contentPadding = PaddingValues(bottom = com.parag.pricescanner.LocalNavPadding.current + 40.dp),
         ) {
             item {
-                Row(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    Modifier.padding(start = 20.dp, end = 20.dp, top = 12.dp).enterUp(0),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
                     Column(Modifier.weight(1f)) {
                         Text("Records", style = MaterialTheme.typography.headlineMedium)
                         Text(s.filter.label(), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    TextButton(onClick = ::export, enabled = !exporting) {
-                        if (exporting) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp)
-                        else Icon(Icons.Rounded.PictureAsPdf, null)
-                        Spacer(Modifier.width(6.dp))
-                        Text("Export PDF")
+                    Surface(
+                        onClick = { adding = true },
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.surfaceContainerLow,
+                        modifier = Modifier.size(44.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+                    ) { Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Add, "Add entry") } }
+                    Surface(
+                        onClick = ::export,
+                        enabled = !exporting,
+                        shape = CircleShape,
+                        color = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                    ) {
+                        Row(Modifier.height(44.dp).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            if (exporting) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                            else Icon(Icons.Rounded.PictureAsPdf, null, Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("PDF", style = MaterialTheme.typography.labelLarge)
+                        }
                     }
                 }
             }
@@ -150,33 +171,38 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
                         focusedContainerColor = MaterialTheme.colorScheme.surfaceContainerLow,
                         unfocusedBorderColor = MaterialTheme.colorScheme.outlineVariant,
                     ),
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 12.dp).enterUp(1),
                 )
             }
             item {
-                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                LazyRow(contentPadding = PaddingValues(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(Period.entries) { p ->
                         FilterChip(
                             selected = s.filter.period == p,
                             onClick = { if (p == Period.CUSTOM) pickRange = true else vm.setPeriod(p) },
                             label = { Text(p.label) },
+                            shape = CircleShape,
+                            colors = inkChip(),
                         )
                     }
                 }
             }
             item {
                 LazyRow(
-                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp),
+                    contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     item {
-                        FilterChip(selected = s.filter.category == null, onClick = { vm.setCategory(null) }, label = { Text("All types") })
+                        FilterChip(selected = s.filter.category == null, onClick = { vm.setCategory(null) }, label = { Text("All types") }, shape = CircleShape, colors = inkChip())
                     }
                     items(com.parag.pricescanner.scan.Category.entries) { c ->
                         FilterChip(
                             selected = s.filter.category == c,
                             onClick = { vm.setCategory(if (s.filter.category == c) null else c) },
                             label = { Text(c.label) },
+                            shape = CircleShape,
+                            leadingIcon = { Icon(c.icon, null, Modifier.size(16.dp), tint = if (s.filter.category == c) MaterialTheme.colorScheme.onPrimary else c.color) },
+                            colors = inkChip(),
                         )
                     }
                 }
@@ -188,7 +214,7 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
                     EmptyState(
                         Icons.Rounded.EventNote,
                         "No records here",
-                        "Scan items on the Scan tab, or tap Add entry to record a purchase by hand.",
+                        "Scan items with the Scan button, or tap + to record a purchase by hand.",
                         Modifier.padding(top = 24.dp),
                     )
                 }
@@ -198,21 +224,32 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
                 stickyHeader(key = "h_${g.date}") {
                     Surface(color = MaterialTheme.colorScheme.background) {
                         Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
+                            Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 16.dp, bottom = 8.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Text(Fmt.dayHeader(g.date), style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                             Text(
-                                "${g.qty} items · ${Fmt.money(g.total)}",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary,
+                                Fmt.dayHeader(g.date).uppercase(),
+                                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 0.8.sp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.weight(1f),
                             )
+                            Text(Fmt.money(g.total), style = MaterialTheme.typography.titleSmall)
                         }
                     }
                 }
-                items(g.items, key = { it.id }) { p ->
-                    PurchaseRow(p, onClick = { editing = p })
-                    HorizontalDivider(Modifier.padding(start = 78.dp, end = 16.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                itemsIndexed(g.items, key = { _, it -> it.id }) { i, p ->
+                    val top = if (i == 0) 22.dp else 0.dp
+                    val bottom = if (i == g.items.lastIndex) 22.dp else 0.dp
+                    val shape = RoundedCornerShape(top, top, bottom, bottom)
+                    Column(
+                        Modifier
+                            .padding(horizontal = 16.dp)
+                            .clip(shape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
+                    ) {
+                        PurchaseRow(p, onClick = { editing = p })
+                        if (i != g.items.lastIndex) HorizontalDivider(Modifier.padding(start = 76.dp, end = 14.dp), color = MaterialTheme.colorScheme.outlineVariant)
+                    }
                 }
             }
         }
@@ -303,15 +340,24 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
 private fun Long.toDate() = Instant.ofEpochMilli(this).atZone(ZoneOffset.UTC).toLocalDate()
 
 @Composable
+private fun inkChip() = FilterChipDefaults.filterChipColors(
+    containerColor = MaterialTheme.colorScheme.surfaceContainerLow,
+    selectedContainerColor = MaterialTheme.colorScheme.primary,
+    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+    selectedLeadingIconColor = MaterialTheme.colorScheme.onPrimary,
+)
+
+@Composable
 private fun SummaryStrip(s: HistoryState) {
+    val b = com.parag.pricescanner.ui.theme.AppTheme.brand
     Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(16.dp)
-            .background(MaterialTheme.colorScheme.primaryContainer, MaterialTheme.shapes.large)
-            .padding(16.dp),
+        Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 14.dp).enterUp(2),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Summary("Spent", Fmt.money(s.total), Modifier.weight(1.4f))
+        Column(Modifier.weight(1.5f).background(b.ink, RoundedCornerShape(22.dp)).padding(16.dp)) {
+            Text("Spent", style = MaterialTheme.typography.labelMedium, color = b.onInkMuted)
+            com.parag.pricescanner.ui.components.CountUpText(s.total, Fmt::money, MaterialTheme.typography.titleLarge, color = b.onInk)
+        }
         Summary("Items", "${s.qty}", Modifier.weight(1f))
         Summary("Days", "${s.groups.size}", Modifier.weight(0.8f))
     }
@@ -319,16 +365,21 @@ private fun SummaryStrip(s: HistoryState) {
 
 @Composable
 private fun Summary(label: String, value: String, modifier: Modifier) {
-    Column(modifier) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f))
-        Text(value, style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimaryContainer, maxLines = 1)
+    Column(
+        modifier
+            .background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(22.dp))
+            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(22.dp))
+            .padding(16.dp)
+    ) {
+        Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(value, style = MaterialTheme.typography.titleLarge, maxLines = 1)
     }
 }
 
 @Composable
 private fun PurchaseRow(p: Purchase, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 16.dp, vertical = 12.dp),
+        Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         com.parag.pricescanner.ui.components.ProductThumb(p.imageUrl, p.productName, size = 48.dp)
@@ -338,7 +389,7 @@ private fun PurchaseRow(p: Purchase, onClick: () -> Unit) {
                 Text(p.productName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false))
                 if (p.source == Purchase.SOURCE_AUTO) {
                     Spacer(Modifier.width(6.dp))
-                    Icon(Icons.Rounded.AutoMode, "Auto counted", tint = Mint, modifier = Modifier.size(14.dp))
+                    Icon(Icons.Rounded.AutoMode, "Auto counted", tint = com.parag.pricescanner.ui.theme.AppTheme.brand.good, modifier = Modifier.size(14.dp))
                 }
             }
             Text(

@@ -21,6 +21,16 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Fetch fonts (Plus Jakarta Sans, Inter; SIL Open Font License)
+        run: |
+          set -e
+          mkdir -p app/src/main/res/font
+          base=https://raw.githubusercontent.com/google/fonts/main/ofl
+          curl -fsSL -o app/src/main/res/font/plus_jakarta_sans.ttf "$base/plusjakartasans/PlusJakartaSans%5Bwght%5D.ttf"
+          curl -fsSL -o app/src/main/res/font/inter.ttf "$base/inter/Inter%5Bopsz,wght%5D.ttf" \
+            || curl -fsSL -o app/src/main/res/font/inter.ttf "$base/inter/Inter%5Bslnt,wght%5D.ttf"
+          ls -la app/src/main/res/font
+
       - name: Unit tests
         run: ./gradlew --no-daemon testDebugUnitTest
 

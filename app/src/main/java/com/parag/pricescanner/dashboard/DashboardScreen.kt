@@ -1,65 +1,81 @@
 package com.parag.pricescanner.dashboard
 
+import android.os.Build
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.CalendarToday
-import androidx.compose.material.icons.rounded.DateRange
-import androidx.compose.material.icons.rounded.EventBusy
-import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material.icons.rounded.Insights
-import androidx.compose.material.icons.rounded.ShoppingBag
-import androidx.compose.material.icons.rounded.TrendingDown
-import androidx.compose.material.icons.rounded.TrendingUp
-import androidx.compose.material.icons.rounded.Today
+import androidx.compose.material.icons.rounded.Tune
+import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.parag.pricescanner.LocalNavPadding
 import com.parag.pricescanner.data.Purchase
 import com.parag.pricescanner.ui.components.AppCard
+import com.parag.pricescanner.ui.components.CountUpText
+import com.parag.pricescanner.ui.components.Donut
 import com.parag.pricescanner.ui.components.EmptyState
-import com.parag.pricescanner.ui.components.IconBadge
+import com.parag.pricescanner.ui.components.InkCard
+import com.parag.pricescanner.ui.components.ProductThumb
+import com.parag.pricescanner.ui.components.Ring
 import com.parag.pricescanner.ui.components.SectionTitle
+import com.parag.pricescanner.ui.components.Slice
 import com.parag.pricescanner.ui.components.color
-import com.parag.pricescanner.ui.theme.Amber
-import com.parag.pricescanner.ui.theme.Indigo
-import com.parag.pricescanner.ui.theme.IndigoDeep
-import com.parag.pricescanner.ui.theme.Mint
-import com.parag.pricescanner.ui.theme.Rose
-import com.parag.pricescanner.ui.theme.Sky
-import com.parag.pricescanner.ui.theme.Violet
+import com.parag.pricescanner.ui.components.enterUp
+import com.parag.pricescanner.ui.theme.AppTheme
+import com.parag.pricescanner.ui.theme.MoneyStyle
 import com.parag.pricescanner.util.Fmt
 import java.time.LocalDate
 import java.time.LocalTime
@@ -68,60 +84,50 @@ import kotlin.math.abs
 @Composable
 fun DashboardScreen(vm: DashboardViewModel = viewModel()) {
     val s by vm.state.collectAsStateWithLifecycle()
+    val dynamic by vm.dynamicColor.collectAsStateWithLifecycle()
+    var settings by rememberSaveable { mutableStateOf(false) }
 
     LazyColumn(
         Modifier.fillMaxSize().statusBarsPadding(),
-        contentPadding = PaddingValues(16.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = LocalNavPadding.current + 40.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        item { Greeting() }
-        item { HeroCard(s) }
+        item { Header(onSettings = { settings = true }, modifier = Modifier.enterUp(0)) }
+        item { HeroCard(s, onSetBudget = { settings = true }, modifier = Modifier.enterUp(1)) }
         if (!s.loading && !s.hasData) {
             item {
-                AppCard {
+                AppCard(Modifier.enterUp(2)) {
                     EmptyState(
                         Icons.Rounded.Insights,
                         "No purchases yet",
-                        "Scan a product on the Scan tab and save it. Your spending charts will appear here.",
+                        "Tap the Scan button, point at a pack's price and save the bill. Your charts appear here.",
                     )
                 }
             }
             return@LazyColumn
         }
+        item { QuickTiles(s, Modifier.enterUp(2)) }
+        if (s.byCategory.isNotEmpty()) item { WhereItWent(s, Modifier.enterUp(3)) }
+        if (s.expiring.isNotEmpty()) item { ExpiringRow(s.expiring, Modifier.enterUp(4)) }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatTile(
-                    Icons.Rounded.Today, Sky, "Today", Fmt.moneyShort(s.today),
-                    compare(s.today, s.yesterday, "yesterday"), Modifier.weight(1f),
-                )
-                StatTile(
-                    Icons.Rounded.DateRange, Violet, "This week", Fmt.moneyShort(s.week),
-                    null, Modifier.weight(1f),
-                )
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                StatTile(
-                    Icons.Rounded.CalendarToday, Amber, "Avg per day", Fmt.moneyShort(s.avgPerDay),
-                    "this month", Modifier.weight(1f),
-                )
-                StatTile(
-                    Icons.Rounded.ShoppingBag, Mint, "Items bought", "${s.monthItems}",
-                    "this month", Modifier.weight(1f),
-                )
-            }
-        }
-        item {
-            AppCard(Modifier.fillMaxWidth()) {
+            AppCard(Modifier.fillMaxWidth().enterUp(5)) {
                 Column {
                     SectionTitle("Spending") {
-                        Text(Fmt.moneyShort(s.rangeTotal), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(Fmt.moneyShort(s.rangeTotal), style = MaterialTheme.typography.titleSmall)
                     }
                     Spacer(Modifier.height(10.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         ChartRange.entries.forEach { r ->
-                            FilterChip(selected = s.range == r, onClick = { vm.setRange(r) }, label = { Text(r.label) })
+                            FilterChip(
+                                selected = s.range == r,
+                                onClick = { vm.setRange(r) },
+                                label = { Text(r.label) },
+                                shape = CircleShape,
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                                ),
+                            )
                         }
                     }
                     Spacer(Modifier.height(12.dp))
@@ -129,94 +135,163 @@ fun DashboardScreen(vm: DashboardViewModel = viewModel()) {
                 }
             }
         }
-        if (s.byCategory.isNotEmpty()) item { CategoryCard(s) }
-        if (s.expiring.isNotEmpty()) item { ExpiringCard(s.expiring) }
-        item { TopProductsCard(s) }
-        item { RecentCard(s.recent) }
+        item { TopProductsCard(s, Modifier.enterUp(6)) }
+        item { RecentCard(s.recent, Modifier.enterUp(7)) }
         item {
             Text(
                 "All-time spend " + Fmt.money(s.allTime),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             )
         }
     }
-}
 
-private fun compare(now: Double, before: Double, label: String): String? {
-    if (before <= 0) return null
-    val pct = (now - before) / before * 100
-    return (if (pct >= 0) "▲ " else "▼ ") + "%.0f%% vs %s".format(abs(pct), label)
+    if (settings) {
+        SettingsSheet(
+            budget = s.budget,
+            dynamic = dynamic,
+            onDismiss = { settings = false },
+            onSave = { b, d -> vm.setBudget(b); vm.setDynamicColor(d); settings = false },
+        )
+    }
 }
 
 @Composable
-private fun Greeting() {
-    val hour = LocalTime.now().hour
-    val hello = when (hour) {
+private fun Header(onSettings: () -> Unit, modifier: Modifier = Modifier) {
+    val hello = when (LocalTime.now().hour) {
         in 5..11 -> "Good morning"
         in 12..16 -> "Good afternoon"
         else -> "Good evening"
     }
-    Column(Modifier.padding(top = 4.dp, bottom = 2.dp)) {
-        Text(Fmt.dayHeader(LocalDate.now()).uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(hello, style = MaterialTheme.typography.headlineMedium)
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                Fmt.dayHeader(LocalDate.now()).uppercase(),
+                style = MaterialTheme.typography.labelMedium.copy(letterSpacing = 1.sp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Text(hello, style = MaterialTheme.typography.headlineMedium)
+        }
+        Surface(
+            onClick = onSettings,
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerLow,
+            modifier = Modifier.size(46.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, CircleShape),
+        ) {
+            Box(contentAlignment = Alignment.Center) { Icon(Icons.Rounded.Tune, "Budget and look") }
+        }
     }
 }
 
 @Composable
-private fun HeroCard(s: DashboardState) {
-    Box(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(28.dp))
-            .background(Brush.linearGradient(listOf(IndigoDeep, Indigo, Violet)))
-            .padding(22.dp),
-    ) {
-        Column {
-            Text(
-                "Spent in " + Fmt.monthYear(LocalDate.now()),
-                color = Color.White.copy(alpha = 0.8f),
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(Fmt.money(s.month), color = Color.White, fontSize = 36.sp, fontWeight = FontWeight.Bold, letterSpacing = (-0.5).sp)
-            Spacer(Modifier.height(10.dp))
-            val change = s.monthChange
-            if (change != null) {
-                val up = change >= 0
-                Row(
-                    Modifier.background(Color.White.copy(alpha = 0.16f), CircleShape).padding(horizontal = 10.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically,
+private fun HeroCard(s: DashboardState, onSetBudget: () -> Unit, modifier: Modifier = Modifier) {
+    val b = AppTheme.brand
+    InkCard(modifier) {
+        Row(verticalAlignment = Alignment.Top) {
+            Column(Modifier.weight(1f)) {
+                Text("Spent in " + Fmt.monthYear(LocalDate.now()), color = b.onInkMuted, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(4.dp))
+                CountUpText(s.month, Fmt::money, MoneyStyle.copy(fontSize = 36.sp), color = b.onInk)
+                Spacer(Modifier.height(8.dp))
+                val change = s.monthChange
+                val pill = when {
+                    change != null -> (if (change >= 0) "▲ " else "▼ ") + "%.0f%% vs last month".format(abs(change))
+                    else -> "First month tracked"
+                }
+                Text(
+                    pill,
+                    color = if (change != null && change > 0) Color(0xFFFDA4AF) else b.accent,
+                    style = MaterialTheme.typography.labelMedium,
+                    modifier = Modifier
+                        .background(b.inkRaised, CircleShape)
+                        .padding(horizontal = 10.dp, vertical = 4.dp),
+                )
+            }
+            if (s.budget > 0) {
+                val over = s.budgetUsed > 1f
+                Ring(
+                    progress = s.budgetUsed,
+                    color = if (over) Color(0xFFFB7185) else b.accent,
+                    track = b.inkLine,
+                    modifier = Modifier.clickable(onClick = onSetBudget),
                 ) {
-                    Icon(if (up) Icons.Rounded.TrendingUp else Icons.Rounded.TrendingDown, null, tint = if (up) Color(0xFFFECACA) else Color(0xFFA7F3D0), modifier = Modifier.size(16.dp))
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        "%.0f%% %s last month (%s)".format(abs(change), if (up) "above" else "below", Fmt.moneyShort(s.lastMonth)),
-                        color = Color.White, style = MaterialTheme.typography.labelMedium,
-                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("${(s.budgetUsed * 100).toInt()}%", style = MaterialTheme.typography.titleMedium, color = b.onInk)
+                        Text("of " + Fmt.compact(s.budget), style = MaterialTheme.typography.labelSmall, color = b.onInkMuted)
+                    }
                 }
             } else {
-                Text("Track every purchase by scanning its price", color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.labelMedium)
+                Surface(onClick = onSetBudget, shape = RoundedCornerShape(16.dp), color = b.inkRaised, contentColor = b.accent) {
+                    Text("Set\nbudget", Modifier.padding(horizontal = 14.dp, vertical = 10.dp), style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
+        if (s.budget > 0) {
+            Spacer(Modifier.height(6.dp))
+            val left = s.budget - s.month
+            Text(
+                if (left >= 0) "${Fmt.money(left)} left this month" else "${Fmt.money(-left)} over budget",
+                color = b.onInkMuted,
+                style = MaterialTheme.typography.labelMedium,
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Sparkbars(s.last7)
+    }
+}
+
+@Composable
+private fun Sparkbars(bars: List<Bar>) {
+    val b = AppTheme.brand
+    val grow = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { grow.animateTo(1f, tween(800, 200, FastOutSlowInEasing)) }
+    val max = bars.maxOfOrNull { it.value }?.takeIf { it > 0 } ?: 1.0
+    Row(Modifier.fillMaxWidth().height(64.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+        bars.forEachIndexed { i, bar ->
+            val last = i == bars.lastIndex
+            Column(Modifier.weight(1f).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Bottom) {
+                val frac = (0.12 + 0.88 * bar.value / max).toFloat() * grow.value
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .weight(1f, fill = false)
+                        .fillMaxHeight(frac.coerceAtLeast(0.05f))
+                        .background(if (last) b.accent else b.inkLine, RoundedCornerShape(6.dp))
+                )
+                Spacer(Modifier.height(6.dp))
+                Text(bar.label, style = MaterialTheme.typography.labelSmall, color = if (last) b.onInk else b.onInkMuted)
             }
         }
     }
 }
 
 @Composable
-private fun StatTile(icon: ImageVector, tint: Color, label: String, value: String, sub: String?, modifier: Modifier = Modifier) {
-    AppCard(modifier) {
+private fun QuickTiles(s: DashboardState, modifier: Modifier = Modifier) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        val todaySub = when {
+            s.yesterday <= 0 -> "today"
+            s.today >= s.yesterday -> "▲ vs yesterday"
+            else -> "▼ vs yesterday"
+        }
+        Tile("Today", Fmt.moneyShort(s.today), todaySub, Modifier.weight(1f))
+        Tile("Per day", Fmt.moneyShort(s.avgPerDay), "this month", Modifier.weight(1f))
+        Tile("Items", "${s.monthItems}", "this month", Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun Tile(label: String, value: String, sub: String, modifier: Modifier = Modifier) {
+    AppCard(modifier, padding = 14.dp) {
         Column {
-            IconBadge(icon, tint, size = 36.dp)
-            Spacer(Modifier.height(12.dp))
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, maxLines = 1)
+            Spacer(Modifier.height(4.dp))
+            Text(value, style = MaterialTheme.typography.titleLarge, maxLines = 1)
             Text(
-                sub ?: " ",
+                sub,
                 style = MaterialTheme.typography.labelSmall,
                 color = when {
-                    sub?.startsWith("▲") == true -> Rose
-                    sub?.startsWith("▼") == true -> Mint
+                    sub.startsWith("▲") -> AppTheme.brand.bad
+                    sub.startsWith("▼") -> AppTheme.brand.good
                     else -> MaterialTheme.colorScheme.onSurfaceVariant
                 },
                 maxLines = 1,
@@ -225,101 +300,93 @@ private fun StatTile(icon: ImageVector, tint: Color, label: String, value: Strin
     }
 }
 
-private val rankColors = listOf(Indigo, Mint, Amber, Sky, Violet)
+@Composable
+private fun WhereItWent(s: DashboardState, modifier: Modifier = Modifier) {
+    val total = s.byCategory.sumOf { it.spend }
+    AppCard(modifier.fillMaxWidth()) {
+        Column {
+            SectionTitle("Where it went") {
+                Text(s.range.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Donut(s.byCategory.map { Slice(it.spend, it.category.color) }) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text("Total", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(Fmt.compact(total), style = MaterialTheme.typography.titleMedium)
+                    }
+                }
+                Spacer(Modifier.width(18.dp))
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    s.byCategory.take(5).forEach { c ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.size(10.dp).background(c.category.color, RoundedCornerShape(3.dp)))
+                            Spacer(Modifier.width(8.dp))
+                            Text(c.category.label, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f), maxLines = 1)
+                            Text(Fmt.moneyShort(c.spend), style = MaterialTheme.typography.labelLarge)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
 
 @Composable
-private fun TopProductsCard(s: DashboardState) {
-    AppCard(Modifier.fillMaxWidth()) {
+private fun ExpiringRow(items: List<Purchase>, modifier: Modifier = Modifier) {
+    Column(modifier) {
+        SectionTitle("Expiring soon")
+        Spacer(Modifier.height(10.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(items, key = { it.id }) { p ->
+                val exp = Fmt.epochDay(p.expiryDate) ?: return@items
+                AppCard(Modifier.width(196.dp), padding = 10.dp) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        ProductThumb(p.imageUrl, p.productName, size = 44.dp)
+                        Spacer(Modifier.width(10.dp))
+                        Column(Modifier.weight(1f)) {
+                            Text(p.productName, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            com.parag.pricescanner.scan.ExpiryTag(exp)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TopProductsCard(s: DashboardState, modifier: Modifier = Modifier) {
+    AppCard(modifier.fillMaxWidth()) {
         Column {
             SectionTitle("Top products") {
                 Text(s.range.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(4.dp))
             if (s.topProducts.isEmpty()) {
                 Text("No purchases in this period.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
             }
             val max = s.topProducts.maxOfOrNull { it.spend }?.takeIf { it > 0 } ?: 1.0
-            s.topProducts.forEachIndexed { i, p ->
-                Column(Modifier.padding(vertical = 8.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        if (p.imageUrl != null) {
-                            com.parag.pricescanner.ui.components.ProductThumb(p.imageUrl, p.name, size = 36.dp)
-                        } else Box(
-                            Modifier.size(26.dp).background(rankColors[i % rankColors.size].copy(alpha = 0.15f), CircleShape),
-                            contentAlignment = Alignment.Center,
-                        ) { Text("${i + 1}", color = rankColors[i % rankColors.size], fontWeight = FontWeight.Bold, fontSize = 12.sp) }
-                        Spacer(Modifier.width(10.dp))
-                        Text(p.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Column(horizontalAlignment = Alignment.End) {
-                            Text(Fmt.money(p.spend), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                            Text("qty ${p.qty}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        }
-                    }
-                    Spacer(Modifier.height(6.dp))
-                    LinearProgressIndicator(
-                        progress = { (p.spend / max).toFloat() },
-                        modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
-                        color = rankColors[i % rankColors.size],
-                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
-                        strokeCap = StrokeCap.Round,
-                        drawStopIndicator = {},
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun CategoryCard(s: DashboardState) {
-    AppCard(Modifier.fillMaxWidth()) {
-        Column {
-            SectionTitle("Spend by category") {
-                Text(s.range.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            Spacer(Modifier.height(12.dp))
-            val total = s.byCategory.sumOf { it.spend }.takeIf { it > 0 } ?: 1.0
-            // Stacked share bar
-            Row(Modifier.fillMaxWidth().height(12.dp).clip(CircleShape)) {
-                s.byCategory.forEach { c ->
-                    val w = (c.spend / total).toFloat()
-                    if (w > 0f) Box(Modifier.weight(w).fillMaxSize().background(c.category.color))
-                }
-            }
-            Spacer(Modifier.height(10.dp))
-            s.byCategory.forEach { c ->
-                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    com.parag.pricescanner.ui.components.CategoryChip(c.category)
-                    Spacer(Modifier.width(8.dp))
-                    Text("qty ${c.qty}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    Text("%.0f%%".format(c.spend / total * 100), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Spacer(Modifier.width(12.dp))
-                    Text(Fmt.money(c.spend), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ExpiringCard(items: List<Purchase>) {
-    AppCard(Modifier.fillMaxWidth()) {
-        Column {
-            SectionTitle("Expiring soon") {
-                Icon(Icons.Rounded.WarningAmber, null, tint = Amber)
-            }
-            Spacer(Modifier.height(6.dp))
-            items.forEach { p ->
-                val exp = Fmt.epochDay(p.expiryDate) ?: return@forEach
-                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (p.imageUrl != null) com.parag.pricescanner.ui.components.ProductThumb(p.imageUrl, p.productName, size = 40.dp)
-                    else IconBadge(Icons.Rounded.EventBusy, if (Fmt.daysLeft(exp) < 0) Rose else Amber, size = 36.dp)
+            s.topProducts.forEach { p ->
+                Row(Modifier.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    ProductThumb(p.imageUrl, p.name, size = 42.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
-                        Text(p.productName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        com.parag.pricescanner.scan.ExpiryTag(exp)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(p.name, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            Text(Fmt.money(p.spend), style = MaterialTheme.typography.labelLarge)
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        LinearProgressIndicator(
+                            progress = { (p.spend / max).toFloat() },
+                            modifier = Modifier.fillMaxWidth().height(6.dp).clip(CircleShape),
+                            color = MaterialTheme.colorScheme.primary,
+                            trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                            strokeCap = StrokeCap.Round,
+                            drawStopIndicator = {},
+                        )
+                        Text("qty ${p.qty}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Text("qty ${p.quantity}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }
@@ -327,26 +394,60 @@ private fun ExpiringCard(items: List<Purchase>) {
 }
 
 @Composable
-private fun RecentCard(recent: List<Purchase>) {
-    AppCard(Modifier.fillMaxWidth()) {
+private fun RecentCard(recent: List<Purchase>, modifier: Modifier = Modifier) {
+    AppCard(modifier.fillMaxWidth()) {
         Column {
             SectionTitle("Recent purchases")
-            Spacer(Modifier.height(6.dp))
+            Spacer(Modifier.height(4.dp))
             recent.forEach { p ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    com.parag.pricescanner.ui.components.ProductThumb(p.imageUrl, p.productName, size = 44.dp)
+                    ProductThumb(p.imageUrl, p.productName, size = 44.dp)
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(p.productName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         Text(
-                            "${Fmt.dayShort(Fmt.date(p.timestamp))} · ${Fmt.time(p.timestamp)} · qty ${p.quantity}",
+                            "${Fmt.dayShort(Fmt.date(p.timestamp))} · ${Fmt.time(p.timestamp)} · ×${p.quantity}",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Text(Fmt.money(p.total), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                    Text(Fmt.money(p.total), style = MaterialTheme.typography.titleSmall)
                 }
             }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SettingsSheet(budget: Double, dynamic: Boolean, onDismiss: () -> Unit, onSave: (Double, Boolean) -> Unit) {
+    var text by remember { mutableStateOf(if (budget > 0) Fmt.price(budget) else "") }
+    var dyn by remember { mutableStateOf(dynamic) }
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 24.dp).navigationBarsPadding(), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Budget and look", style = MaterialTheme.typography.titleLarge)
+            OutlinedTextField(
+                value = text,
+                onValueChange = { v -> text = v.filter { it.isDigit() || it == '.' } },
+                label = { Text("Monthly budget (₹)") },
+                supportingText = { Text("The ring on the dashboard shows how much of it you've used. Leave empty to hide it.") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth(),
+            )
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Match my wallpaper", style = MaterialTheme.typography.titleSmall)
+                        Text("Use your wallpaper colour as the accent instead of lime.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Switch(checked = dyn, onCheckedChange = { dyn = it })
+                }
+            }
+            Button(
+                onClick = { onSave(text.toDoubleOrNull() ?: 0.0, dyn) },
+                modifier = Modifier.fillMaxWidth().height(52.dp),
+            ) { Text("Save") }
         }
     }
 }

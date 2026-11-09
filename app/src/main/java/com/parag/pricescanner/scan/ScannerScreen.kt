@@ -2,6 +2,8 @@
 
 package com.parag.pricescanner.scan
 
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.navigationBarsPadding
 import android.Manifest
 import android.content.pm.PackageManager
 import android.media.AudioManager
@@ -164,6 +166,7 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
                 autoMode = state.autoMode,
                 torchOn = state.torchOn,
                 onTorch = vm::toggleTorch,
+                onMode = vm::setAutoMode,
                 modifier = Modifier.align(Alignment.TopCenter),
             )
 
@@ -187,7 +190,6 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
             onQty = vm::changeQty,
             onClear = vm::clearCart,
             onSave = vm::saveCart,
-            onMode = vm::setAutoMode,
         )
     }
 
@@ -245,34 +247,39 @@ private fun TopControls(
     autoMode: Boolean,
     torchOn: Boolean,
     onTorch: () -> Unit,
+    onMode: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val b = com.parag.pricescanner.ui.theme.AppTheme.brand
     Row(
         modifier
             .fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent)))
+            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent)))
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(Modifier.weight(1f)) {
-            Text("PriceScan", color = Color.White, style = MaterialTheme.typography.titleLarge)
-            Text(
-                if (autoMode) "Auto count: show each packet" else "Manual: tap capture",
-                color = Color.White.copy(alpha = 0.75f),
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-        IconButton(
+        Surface(
             onClick = onTorch,
-            colors = IconButtonDefaults.iconButtonColors(containerColor = Color.White.copy(alpha = 0.15f), contentColor = Color.White),
-        ) { Icon(if (torchOn) Icons.Rounded.FlashOn else Icons.Rounded.FlashOff, "Torch") }
+            shape = CircleShape,
+            color = if (torchOn) b.accent else b.ink.copy(alpha = 0.6f),
+            contentColor = if (torchOn) b.onAccent else Color.White,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.18f)),
+            modifier = Modifier.size(46.dp),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(if (torchOn) Icons.Rounded.FlashOn else Icons.Rounded.FlashOff, "Torch", Modifier.size(22.dp))
+            }
+        }
+        Spacer(Modifier.weight(1f))
+        ModeSwitch(autoMode, onMode)
     }
 }
 
 @Composable
 private fun ScanOverlay(active: Boolean, modifier: Modifier = Modifier) {
-    val corner by animateColorAsState(if (active) Mint else Color.White, label = "corner")
+    val accent = com.parag.pricescanner.ui.theme.AppTheme.brand.accent
+    val corner by animateColorAsState(if (active) accent else Color.White, label = "corner")
     val t = rememberInfiniteTransition(label = "scan")
     val line by t.animateFloat(0f, 1f, infiniteRepeatable(tween(1800, easing = LinearEasing), RepeatMode.Reverse), label = "line")
     Canvas(modifier) {
@@ -315,13 +322,21 @@ private fun ScanOverlay(active: Boolean, modifier: Modifier = Modifier) {
 private fun DetectionBubble(d: Detection?, modifier: Modifier = Modifier, onClick: () -> Unit = {}) {
     AnimatedVisibility(visible = d != null, enter = fadeIn(), exit = fadeOut(), modifier = modifier) {
         if (d == null) return@AnimatedVisibility
-        Surface(onClick = onClick, shape = RoundedCornerShape(20.dp), color = Color.Black.copy(alpha = 0.7f), contentColor = Color.White) {
-            Row(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+        val b = com.parag.pricescanner.ui.theme.AppTheme.brand
+        Surface(
+            onClick = onClick,
+            shape = RoundedCornerShape(24.dp),
+            color = b.ink.copy(alpha = 0.86f),
+            contentColor = Color.White,
+            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.14f)),
+            modifier = Modifier.padding(horizontal = 16.dp),
+        ) {
+            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
                 if (d.imageUrl != null) {
                     com.parag.pricescanner.ui.components.ProductThumb(d.imageUrl, d.displayName.orEmpty(), size = 52.dp)
                     Spacer(Modifier.width(12.dp))
                 } else if (d.barcode != null) {
-                    Icon(Icons.Rounded.QrCode2, null, tint = Mint, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Rounded.QrCode2, null, tint = b.accent, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                 }
                 Column {
@@ -331,8 +346,8 @@ private fun DetectionBubble(d: Detection?, modifier: Modifier = Modifier, onClic
                     }
                     Text(
                         d.price?.let { Fmt.money(it) } ?: "Price not found",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
+                        style = com.parag.pricescanner.ui.theme.MoneyStyle.copy(fontSize = 24.sp),
+                        color = if (d.price != null) b.accent else Color.White,
                     )
                     d.displayName?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f), maxLines = 1)
@@ -369,7 +384,8 @@ private fun DetectionBubble(d: Detection?, modifier: Modifier = Modifier, onClic
 
 @Composable
 private fun CountFlash(ev: CountEvent) {
-    Surface(shape = CircleShape, color = Mint, contentColor = Color.White, shadowElevation = 8.dp) {
+    val b = com.parag.pricescanner.ui.theme.AppTheme.brand
+    Surface(shape = CircleShape, color = b.accent, contentColor = b.onAccent, shadowElevation = 8.dp) {
         Row(Modifier.padding(horizontal = 20.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Rounded.CheckCircle, null)
             Spacer(Modifier.width(8.dp))
@@ -414,20 +430,21 @@ private fun BottomPanel(
     onQty: (String, Int) -> Unit,
     onClear: () -> Unit,
     onSave: () -> Unit,
-    onMode: (Boolean) -> Unit,
 ) {
     Surface(
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-        color = MaterialTheme.colorScheme.surface,
+        shape = RoundedCornerShape(topStart = 30.dp, topEnd = 30.dp),
+        color = MaterialTheme.colorScheme.background,
         modifier = Modifier.fillMaxWidth(),
     ) {
-        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp, bottom = 8.dp)) {
+        Column(
+            Modifier
+                .navigationBarsPadding()
+                .padding(start = 20.dp, end = 20.dp, top = 10.dp, bottom = com.parag.pricescanner.LocalNavPadding.current)
+        ) {
             Box(
                 Modifier.align(Alignment.CenterHorizontally).size(width = 36.dp, height = 4.dp)
                     .background(MaterialTheme.colorScheme.outline, CircleShape)
             )
-            Spacer(Modifier.height(10.dp))
-            ModeSwitch(state.autoMode, onMode)
 
             if (state.cart.isEmpty()) {
                 Row(Modifier.padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -445,11 +462,12 @@ private fun BottomPanel(
                 }
             } else {
                 Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(
-                        "This bill · ${state.cartQty} items",
-                        style = MaterialTheme.typography.titleSmall,
-                        modifier = Modifier.weight(1f),
-                    )
+                    Column(Modifier.weight(1f)) {
+                        Text("This bill · ${state.cartQty} items", style = MaterialTheme.typography.titleSmall)
+                        com.parag.pricescanner.ui.components.CountUpText(
+                            state.cartTotal, Fmt::money, com.parag.pricescanner.ui.theme.MoneyStyle.copy(fontSize = 24.sp),
+                        )
+                    }
                     TextButton(onClick = onClear) {
                         Icon(Icons.Rounded.DeleteSweep, null, Modifier.size(18.dp))
                         Spacer(Modifier.width(4.dp))
@@ -502,19 +520,25 @@ private fun BottomPanel(
 
 @Composable
 private fun ModeSwitch(autoMode: Boolean, onMode: (Boolean) -> Unit) {
-    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
-        SegmentedButton(
-            selected = autoMode,
-            onClick = { onMode(true) },
-            shape = SegmentedButtonDefaults.itemShape(0, 2),
-            icon = { SegmentedButtonDefaults.Icon(autoMode) { Icon(Icons.Rounded.AutoMode, null, Modifier.size(18.dp)) } },
-        ) { Text("Auto count") }
-        SegmentedButton(
-            selected = !autoMode,
-            onClick = { onMode(false) },
-            shape = SegmentedButtonDefaults.itemShape(1, 2),
-            icon = { SegmentedButtonDefaults.Icon(!autoMode) { Icon(Icons.Rounded.TouchApp, null, Modifier.size(18.dp)) } },
-        ) { Text("Manual") }
+    val b = com.parag.pricescanner.ui.theme.AppTheme.brand
+    Row(
+        Modifier
+            .background(b.ink.copy(alpha = 0.7f), CircleShape)
+            .border(1.dp, Color.White.copy(alpha = 0.18f), CircleShape)
+            .padding(4.dp),
+    ) {
+        listOf(true to "Auto", false to "Manual").forEach { (auto, label) ->
+            val selected = autoMode == auto
+            val bg by animateColorAsState(if (selected) b.accent else Color.Transparent, label = "modeBg")
+            val fg by animateColorAsState(if (selected) b.onAccent else Color.White, label = "modeFg")
+            Surface(onClick = { onMode(auto) }, shape = CircleShape, color = bg, contentColor = fg) {
+                Row(Modifier.height(38.dp).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(if (auto) Icons.Rounded.AutoMode else Icons.Rounded.TouchApp, null, Modifier.size(16.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(label, style = MaterialTheme.typography.labelLarge)
+                }
+            }
+        }
     }
 }
 
@@ -523,8 +547,8 @@ fun ExpiryTag(exp: java.time.LocalDate, modifier: Modifier = Modifier) {
     val days = Fmt.daysLeft(exp)
     val color = when {
         days < 0 -> MaterialTheme.colorScheme.error
-        days <= 30 -> com.parag.pricescanner.ui.theme.Amber
-        else -> com.parag.pricescanner.ui.theme.Mint
+        days <= 30 -> com.parag.pricescanner.ui.theme.AppTheme.brand.warn
+        else -> com.parag.pricescanner.ui.theme.AppTheme.brand.good
     }
     Text(Fmt.expiryText(exp), color = color, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, modifier = modifier)
 }

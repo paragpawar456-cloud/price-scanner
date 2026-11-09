@@ -18,9 +18,9 @@ An Android app that opens straight to a camera scanner, reads a product's price 
 - **Bill list**: review the items scanned, fix name, price or quantity, then Save.
 - **Remembers products**: after you save a barcoded item once, the next scan fills in its name and price.
 - **Date-wise records**: grouped by day with daily totals, search, filters (Today, This week, This month, Custom range), edit, delete with undo.
-- **Dashboard**: month spend with change vs last month, today / week / average per day / items bought, 7-day, 30-day and 12-month charts, top products, recent purchases.
+- **Dashboard**: month spend that counts up, change vs last month, a monthly budget ring (set it with the button at the top right), a 7-day bar strip, today / per day / items tiles, a "where it went" category donut, expiring-soon cards, 7-day, 30-day and 12-month charts, top products and recent purchases.
 - **PDF export**: a formatted report (summary, top products, date-wise table with daily subtotals, grand total) for the current filter, ready to open, share or save.
-- Light and dark theme, Material 3 design.
+- **New look (v1.5)**: ink and lime design with Plus Jakarta Sans headings and Inter text, a floating bottom bar with a raised Scan button, animated numbers, rings and charts, and screens that ease in. Follows the phone's light or dark mode; on Android 12+ you can switch on "Match my wallpaper" to take the accent colour from your wallpaper.
 
 ## Get the APK
 
@@ -31,7 +31,15 @@ Every push to `main` builds the app on GitHub Actions.
 
 ## Build it yourself
 
-Open the folder in Android Studio (Ladybug or newer) and press Run, or from a terminal with the Android SDK installed:
+The two fonts are not stored in the repo. Download them first (the CI does the same):
+
+```
+mkdir -p app/src/main/res/font
+curl -fsSL -o app/src/main/res/font/plus_jakarta_sans.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/plusjakartasans/PlusJakartaSans%5Bwght%5D.ttf"
+curl -fsSL -o app/src/main/res/font/inter.ttf "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/Inter%5Bopsz,wght%5D.ttf"
+```
+
+Then open the folder in Android Studio (Ladybug or newer) and press Run, or from a terminal with the Android SDK installed:
 
 ```
 ./gradlew assembleRelease

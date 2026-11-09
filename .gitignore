@@ -6,3 +6,6 @@ local.properties
 .DS_Store
 captures/
 .kotlin/
+
+# Fonts are downloaded by CI (see build.yml)
+app/src/main/res/font/*.ttf

@@ -42,7 +42,12 @@ data class DashboardState(
     /** Purchases with an expiry date within the next 30 days or already past (last 60 days), soonest first. */
     val expiring: List<Purchase> = emptyList(),
     val byCategory: List<CategoryStat> = emptyList(),
+    /** Last 7 days, oldest first, for the hero sparkline. */
+    val last7: List<Bar> = emptyList(),
+    /** Monthly budget in rupees, 0 when not set. */
+    val budget: Double = 0.0,
 ) {
+    val budgetUsed: Float get() = if (budget > 0) (month / budget).toFloat() else 0f
     /** Month-over-month change in percent, null when there is nothing to compare. */
     val monthChange: Double? get() = if (lastMonth > 0) (month - lastMonth) / lastMonth * 100 else null
 }
@@ -50,12 +55,18 @@ data class DashboardState(
 class DashboardViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = Repository.get(app)
     private val range = MutableStateFlow(ChartRange.WEEK)
+    private val prefs = com.parag.pricescanner.util.Prefs.get(app)
 
-    val state: StateFlow<DashboardState> = combine(repo.purchases, range) { all, r -> compute(all, r) }
+    val state: StateFlow<DashboardState> = combine(repo.purchases, range, prefs.budget) { all, r, budget ->
+        compute(all, r).copy(budget = budget)
+    }
         .flowOn(Dispatchers.Default)
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), DashboardState())
 
     fun setRange(r: ChartRange) { range.value = r }
+    fun setBudget(v: Double) = prefs.setBudget(v)
+    fun setDynamicColor(on: Boolean) = prefs.setDynamicColor(on)
+    val dynamicColor = prefs.dynamicColor
 
     private fun compute(all: List<Purchase>, r: ChartRange): DashboardState {
         val today = LocalDate.now()
@@ -106,6 +117,10 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             avgPerDay = month / today.dayOfMonth,
             range = r,
             bars = bars,
+            last7 = (6 downTo 0).map { i ->
+                val d = today.minusDays(i.toLong())
+                Bar(Fmt.weekday(d).take(1), byDay[d].orEmpty().sumOf { it.total }, Fmt.dayShort(d))
+            },
             rangeTotal = bars.sumOf { it.value },
             topProducts = top,
             recent = all.take(6),
