@@ -38,6 +38,8 @@ data class DashboardState(
     val rangeTotal: Double = 0.0,
     val topProducts: List<ProductStat> = emptyList(),
     val recent: List<Purchase> = emptyList(),
+    /** Purchases with an expiry date within the next 30 days or already past (last 60 days), soonest first. */
+    val expiring: List<Purchase> = emptyList(),
 ) {
     /** Month-over-month change in percent, null when there is nothing to compare. */
     val monthChange: Double? get() = if (lastMonth > 0) (month - lastMonth) / lastMonth * 100 else null
@@ -105,6 +107,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             rangeTotal = bars.sumOf { it.value },
             topProducts = top,
             recent = all.take(6),
+            expiring = all.filter { p ->
+                p.expiryDate?.let { it <= today.plusDays(30).toEpochDay() && it >= today.minusDays(60).toEpochDay() } == true
+            }.sortedBy { it.expiryDate }.take(6),
         )
     }
 }

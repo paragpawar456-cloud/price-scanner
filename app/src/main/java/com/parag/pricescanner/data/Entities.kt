@@ -15,6 +15,10 @@ data class Purchase(
     val timestamp: Long,
     /** "AUTO" when counted by the scanner, "MANUAL" when entered or edited by hand. */
     val source: String = SOURCE_MANUAL,
+    /** Manufacture / packing date as epoch day (LocalDate.toEpochDay), if read or entered. */
+    val mfgDate: Long? = null,
+    /** Expiry / use-by / best-before date as epoch day. */
+    val expiryDate: Long? = null,
 ) {
     val total: Double get() = unitPrice * quantity
 

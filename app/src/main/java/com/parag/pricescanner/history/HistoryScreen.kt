@@ -209,7 +209,7 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
             showDate = true,
             onDismiss = { adding = false },
             onSave = { d ->
-                vm.add(d.name, d.price ?: 0.0, d.qty, d.date ?: java.time.LocalDate.now())
+                vm.add(d.name, d.price ?: 0.0, d.qty, d.date ?: java.time.LocalDate.now(), d.mfgDate, d.expiryDate)
                 adding = false
             },
         )
@@ -217,12 +217,15 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
     editing?.let { p ->
         ItemEditorSheet(
             title = "Edit purchase",
-            initial = ItemDraft(p.productName, p.unitPrice, p.quantity, Fmt.date(p.timestamp)),
+            initial = ItemDraft(
+                p.productName, p.unitPrice, p.quantity, Fmt.date(p.timestamp),
+                Fmt.epochDay(p.mfgDate), Fmt.epochDay(p.expiryDate),
+            ),
             nameSuggestions = names,
             showDate = true,
             onDismiss = { editing = null },
             onSave = { d ->
-                vm.update(p, d.name, d.price ?: p.unitPrice, d.qty, d.date ?: Fmt.date(p.timestamp))
+                vm.update(p, d.name, d.price ?: p.unitPrice, d.qty, d.date ?: Fmt.date(p.timestamp), d.mfgDate, d.expiryDate)
                 editing = null
             },
             onDelete = {
@@ -331,6 +334,17 @@ private fun PurchaseRow(p: Purchase, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            val mfg = Fmt.epochDay(p.mfgDate)
+            val exp = Fmt.epochDay(p.expiryDate)
+            if (mfg != null || exp != null) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    mfg?.let {
+                        Text("Mfg ${Fmt.dayFull(it)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (exp != null) Text("  ·  ", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    exp?.let { com.parag.pricescanner.scan.ExpiryTag(it) }
+                }
+            }
         }
         Text(Fmt.money(p.total), style = MaterialTheme.typography.titleSmall)
     }

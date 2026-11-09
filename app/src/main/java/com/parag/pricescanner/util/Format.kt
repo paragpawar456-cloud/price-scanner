@@ -51,6 +51,20 @@ object Fmt {
     }
     fun dayShort(d: LocalDate): String = dayShort.format(d)
     fun dayFull(d: LocalDate): String = dayFull.format(d)
+    fun epochDay(v: Long?): LocalDate? = v?.let(LocalDate::ofEpochDay)
+
+    /** Days until expiry (negative when expired). */
+    fun daysLeft(exp: LocalDate): Long = java.time.temporal.ChronoUnit.DAYS.between(LocalDate.now(), exp)
+
+    fun expiryText(exp: LocalDate): String {
+        val n = daysLeft(exp)
+        return when {
+            n < 0 -> "Expired " + dayFull(exp)
+            n == 0L -> "Expires today"
+            n <= 30 -> "Expires in $n day" + (if (n == 1L) "" else "s")
+            else -> "Exp " + dayFull(exp)
+        }
+    }
     fun time(millis: Long): String = time.format(dateTime(millis))
     fun month(d: LocalDate): String = month.format(d)
     fun monthYear(d: LocalDate): String = monthYear.format(d)

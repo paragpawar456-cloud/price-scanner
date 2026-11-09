@@ -39,10 +39,12 @@ object PdfExporter {
         val cell = paint(9.5f, ink)
         val cellMuted = paint(9f, muted)
         val cellBold = paint(9.5f, ink, bold = true)
+        val expired = paint(9f, Color.rgb(225, 29, 72), bold = true)
         val fill = Paint(Paint.ANTI_ALIAS_FLAG)
 
-        // Table columns: Date | Product | Qty | Unit price | Amount
-        val colX = floatArrayOf(M, M + 80, M + 330, M + 380, M + 460)
+        // Table columns: Date | Product | Mfg | Expiry | Qty | Unit price | Amount
+        // colX: 0 date, 1 product, 2 mfg, 3 expiry, 4 qty(right edge), 5 unit(right edge)
+        val colX = floatArrayOf(M, M + 66, M + 228, M + 290, M + 378, M + 450)
         val right = W - M
 
         var pageNo = 0
@@ -64,8 +66,10 @@ object PdfExporter {
             val ty = y + 15f
             c.drawText("Date", colX[0] + 8, ty, head)
             c.drawText("Product", colX[1], ty, head)
-            drawRight(c, "Qty", colX[3] - 12, ty, head)
-            drawRight(c, "Unit price", colX[4] - 12, ty, head)
+            c.drawText("Mfg", colX[2], ty, head)
+            c.drawText("Expiry", colX[3], ty, head)
+            drawRight(c, "Qty", colX[4], ty, head)
+            drawRight(c, "Unit", colX[5], ty, head)
             drawRight(c, "Amount", right - 8, ty, head)
             y += 30f
         }
@@ -112,7 +116,7 @@ object PdfExporter {
                     y += 16f
                     top.forEach { (name, q, amt) ->
                         c.drawText(ellipsize(name, cell, 300f), M, y, cell)
-                        drawRight(c, "qty $q", colX[3] - 12, y, cellMuted)
+                        drawRight(c, "qty $q", colX[4], y, cellMuted)
                         drawRight(c, Fmt.money(amt), right - 8, y, cellBold)
                         y += 15f
                     }
@@ -136,10 +140,14 @@ object PdfExporter {
             var firstRow = true
             for (p in list) {
                 if (y > H - 70f) { newPage(first = false); firstRow = true }
-                if (firstRow) c.drawText(Fmt.dayShort(day) + " " + day.year, colX[0] + 8, y, cellBold)
-                c.drawText(ellipsize(p.productName, cell, 230f), colX[1], y, cell)
-                drawRight(c, "${p.quantity}", colX[3] - 12, y, cell)
-                drawRight(c, Fmt.money(p.unitPrice), colX[4] - 12, y, cell)
+                if (firstRow) c.drawText(shortDate(day), colX[0] + 6, y, cellBold)
+                c.drawText(ellipsize(p.productName, cell, colX[2] - colX[1] - 8), colX[1], y, cell)
+                Fmt.epochDay(p.mfgDate)?.let { c.drawText(shortDate(it), colX[2], y, cellMuted) }
+                Fmt.epochDay(p.expiryDate)?.let {
+                    c.drawText(shortDate(it), colX[3], y, if (it.isBefore(java.time.LocalDate.now())) expired else cellMuted)
+                }
+                drawRight(c, "${p.quantity}", colX[4], y, cell)
+                drawRight(c, Fmt.money(p.unitPrice), colX[5], y, cell)
                 drawRight(c, Fmt.money(p.total), right - 8, y, cell)
                 y += 6f
                 c.drawLine(colX[1], y, right, y, stroke(line))
@@ -199,6 +207,9 @@ object PdfExporter {
         this.color = color
         typeface = Typeface.create(Typeface.SANS_SERIF, if (bold) Typeface.BOLD else Typeface.NORMAL)
     }
+
+    private val shortFmt = java.time.format.DateTimeFormatter.ofPattern("dd MMM yy", java.util.Locale.ENGLISH)
+    private fun shortDate(d: java.time.LocalDate) = shortFmt.format(d)
 
     private fun stroke(color: Int) = Paint(Paint.ANTI_ALIAS_FLAG).apply { this.color = color; strokeWidth = 0.8f }
 

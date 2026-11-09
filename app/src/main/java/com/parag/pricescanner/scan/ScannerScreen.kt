@@ -191,13 +191,16 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
         val d = capture
         ItemEditorSheet(
             title = if (d == null) "Add item" else "Add scanned item",
-            initial = ItemDraft(name = d?.displayName.orEmpty(), price = d?.price, qty = 1),
+            initial = ItemDraft(
+                name = d?.displayName.orEmpty(), price = d?.price, qty = 1,
+                mfgDate = d?.mfgDate, expiryDate = d?.expiryDate,
+            ),
             priceSuggestions = d?.alternatives.orEmpty(),
             nameSuggestions = names,
             confirmLabel = "Add to list",
             onDismiss = { captureOpen = false },
             onSave = { draft ->
-                vm.addManual(draft.name, draft.price ?: 0.0, draft.qty, d?.barcode)
+                vm.addManual(draft.name, draft.price ?: 0.0, draft.qty, d?.barcode, draft.mfgDate, draft.expiryDate)
                 captureOpen = false
             },
         )
@@ -205,11 +208,16 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
     editing?.let { item ->
         ItemEditorSheet(
             title = "Edit item",
-            initial = ItemDraft(item.name, item.price, item.qty),
+            initial = ItemDraft(item.name, item.price, item.qty, mfgDate = item.mfgDate, expiryDate = item.expiryDate),
             nameSuggestions = names,
             onDismiss = { editing = null },
             onSave = { draft ->
-                vm.updateItem(item.copy(name = draft.name, price = draft.price ?: item.price, qty = draft.qty, auto = false))
+                vm.updateItem(
+                    item.copy(
+                        name = draft.name, price = draft.price ?: item.price, qty = draft.qty, auto = false,
+                        mfgDate = draft.mfgDate, expiryDate = draft.expiryDate,
+                    )
+                )
                 editing = null
             },
             onDelete = { vm.removeItem(item.id); editing = null },
@@ -307,6 +315,16 @@ private fun DetectionBubble(d: Detection?, modifier: Modifier = Modifier) {
                     d.displayName?.let {
                         Text(it, style = MaterialTheme.typography.bodySmall, color = Color.White.copy(alpha = 0.8f), maxLines = 1)
                     }
+                    if (d.mfgDate != null || d.expiryDate != null) {
+                        Text(
+                            listOfNotNull(
+                                d.mfgDate?.let { "Mfg " + Fmt.dayFull(it) },
+                                d.expiryDate?.let { "Exp " + Fmt.dayFull(it) },
+                            ).joinToString("  ·  "),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(0xFFFDE68A),
+                        )
+                    }
                 }
             }
         }
@@ -383,7 +401,7 @@ private fun BottomPanel(
                     )
                     Spacer(Modifier.width(12.dp))
                     Text(
-                        if (state.autoMode) "Point the camera at the MRP or barcode. Each packet you show is counted: 5 packets of Maggi = qty 5."
+                        if (state.autoMode) "Point the camera at the price label (MRP). No barcode needed. Each packet you show is counted, and mfg / expiry dates are read too."
                         else "Point at the MRP or barcode and tap Capture, then set the quantity yourself.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -465,6 +483,17 @@ private fun ModeSwitch(autoMode: Boolean, onMode: (Boolean) -> Unit) {
 }
 
 @Composable
+fun ExpiryTag(exp: java.time.LocalDate, modifier: Modifier = Modifier) {
+    val days = Fmt.daysLeft(exp)
+    val color = when {
+        days < 0 -> MaterialTheme.colorScheme.error
+        days <= 30 -> com.parag.pricescanner.ui.theme.Amber
+        else -> com.parag.pricescanner.ui.theme.Mint
+    }
+    Text(Fmt.expiryText(exp), color = color, style = MaterialTheme.typography.labelSmall, fontWeight = FontWeight.SemiBold, modifier = modifier)
+}
+
+@Composable
 private fun CartRow(item: CartItem, onClick: () -> Unit, onQty: (Int) -> Unit) {
     Row(
         Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 8.dp),
@@ -480,6 +509,7 @@ private fun CartRow(item: CartItem, onClick: () -> Unit, onQty: (Int) -> Unit) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                 )
+                item.expiryDate?.let { ExpiryTag(it) }
             }
         }
         QuantityStepper(qty = item.qty, onChange = onQty, compact = true)

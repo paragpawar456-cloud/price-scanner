@@ -98,14 +98,20 @@ class HistoryViewModel(private val app: Application) : AndroidViewModel(app) {
         return date.atTime(time).atZone(Fmt.zone).toInstant().toEpochMilli()
     }
 
-    fun add(name: String, price: Double, qty: Int, date: LocalDate) = viewModelScope.launch {
-        repo.add(Purchase(productName = name, unitPrice = price, quantity = qty, timestamp = timestampFor(date, null)))
+    fun add(name: String, price: Double, qty: Int, date: LocalDate, mfg: LocalDate?, exp: LocalDate?) = viewModelScope.launch {
+        repo.add(
+            Purchase(
+                productName = name, unitPrice = price, quantity = qty, timestamp = timestampFor(date, null),
+                mfgDate = mfg?.toEpochDay(), expiryDate = exp?.toEpochDay(),
+            )
+        )
     }
 
-    fun update(p: Purchase, name: String, price: Double, qty: Int, date: LocalDate) = viewModelScope.launch {
+    fun update(p: Purchase, name: String, price: Double, qty: Int, date: LocalDate, mfg: LocalDate?, exp: LocalDate?) = viewModelScope.launch {
         repo.update(
             p.copy(
                 productName = name, unitPrice = price, quantity = qty,
+                mfgDate = mfg?.toEpochDay(), expiryDate = exp?.toEpochDay(),
                 timestamp = if (Fmt.date(p.timestamp) == date) p.timestamp else timestampFor(date, p.timestamp),
                 source = Purchase.SOURCE_MANUAL,
             )

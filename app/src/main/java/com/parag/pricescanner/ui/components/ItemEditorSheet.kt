@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -17,6 +18,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarMonth
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
@@ -52,7 +54,11 @@ data class ItemDraft(
     val price: Double? = null,
     val qty: Int = 1,
     val date: LocalDate? = null,
+    val mfgDate: LocalDate? = null,
+    val expiryDate: LocalDate? = null,
 )
+
+private enum class PickFor { DATE, MFG, EXPIRY }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,7 +79,9 @@ fun ItemEditorSheet(
     var qty by remember { mutableStateOf(initial.qty.coerceAtLeast(1)) }
     var qtyText by remember { mutableStateOf(initial.qty.coerceAtLeast(1).toString()) }
     var date by remember { mutableStateOf(initial.date ?: LocalDate.now()) }
-    var showPicker by remember { mutableStateOf(false) }
+    var mfg by remember { mutableStateOf(initial.mfgDate) }
+    var exp by remember { mutableStateOf(initial.expiryDate) }
+    var pickFor by remember { mutableStateOf<PickFor?>(null) }
 
     val price = priceText.replace(',', '.').toDoubleOrNull()
     val valid = name.isNotBlank() && price != null && price > 0 && qty > 0
@@ -145,11 +153,17 @@ fun ItemEditorSheet(
 
             if (showDate) {
                 Spacer(Modifier.height(12.dp))
-                OutlinedButton(onClick = { showPicker = true }, modifier = Modifier.fillMaxWidth()) {
+                OutlinedButton(onClick = { pickFor = PickFor.DATE }, modifier = Modifier.fillMaxWidth()) {
                     Icon(Icons.Rounded.CalendarMonth, null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Date: " + Fmt.dayFull(date))
+                    Text("Purchase date: " + Fmt.dayFull(date))
                 }
+            }
+
+            Spacer(Modifier.height(12.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DateField("Mfg / packed", mfg, { pickFor = PickFor.MFG }, { mfg = null }, Modifier.weight(1f))
+                DateField("Expiry / use by", exp, { pickFor = PickFor.EXPIRY }, { exp = null }, Modifier.weight(1f))
             }
 
             Spacer(Modifier.height(16.dp))
@@ -173,7 +187,7 @@ fun ItemEditorSheet(
             }
             Spacer(Modifier.height(12.dp))
             Button(
-                onClick = { onSave(ItemDraft(name.trim(), price, qty, if (showDate) date else null)) },
+                onClick = { onSave(ItemDraft(name.trim(), price, qty, if (showDate) date else null, mfg, exp)) },
                 enabled = valid,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text(confirmLabel) }
@@ -181,21 +195,38 @@ fun ItemEditorSheet(
         }
     }
 
-    if (showPicker) {
+    pickFor?.let { target ->
+        val start = when (target) { PickFor.DATE -> date; PickFor.MFG -> mfg ?: LocalDate.now(); PickFor.EXPIRY -> exp ?: LocalDate.now() }
         val pickerState = rememberDatePickerState(
-            initialSelectedDateMillis = date.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(),
+            initialSelectedDateMillis = start.atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli(),
         )
         DatePickerDialog(
-            onDismissRequest = { showPicker = false },
+            onDismissRequest = { pickFor = null },
             confirmButton = {
                 TextButton(onClick = {
                     pickerState.selectedDateMillis?.let {
-                        date = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
+                        val d = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
+                        when (target) { PickFor.DATE -> date = d; PickFor.MFG -> mfg = d; PickFor.EXPIRY -> exp = d }
                     }
-                    showPicker = false
+                    pickFor = null
                 }) { Text("OK") }
             },
-            dismissButton = { TextButton(onClick = { showPicker = false }) { Text("Cancel") } },
+            dismissButton = { TextButton(onClick = { pickFor = null }) { Text("Cancel") } },
         ) { DatePicker(state = pickerState) }
+    }
+}
+
+@Composable
+private fun DateField(label: String, value: LocalDate?, onPick: () -> Unit, onClear: () -> Unit, modifier: Modifier) {
+    OutlinedButton(onClick = onPick, modifier = modifier, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 8.dp)) {
+        Column(Modifier.weight(1f)) {
+            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(value?.let(Fmt::dayFull) ?: "Not set", style = MaterialTheme.typography.bodyMedium)
+        }
+        if (value != null) {
+            androidx.compose.material3.IconButton(onClick = onClear, modifier = Modifier.size(24.dp)) {
+                Icon(androidx.compose.material.icons.Icons.Rounded.Close, "Clear", Modifier.size(16.dp))
+            }
+        }
     }
 }

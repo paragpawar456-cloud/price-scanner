@@ -20,6 +20,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CalendarToday
 import androidx.compose.material.icons.rounded.DateRange
+import androidx.compose.material.icons.rounded.EventBusy
+import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material.icons.rounded.Insights
 import androidx.compose.material.icons.rounded.ShoppingBag
 import androidx.compose.material.icons.rounded.TrendingDown
@@ -126,6 +128,7 @@ fun DashboardScreen(vm: DashboardViewModel = viewModel()) {
                 }
             }
         }
+        if (s.expiring.isNotEmpty()) item { ExpiringCard(s.expiring) }
         item { TopProductsCard(s) }
         item { RecentCard(s.recent) }
         item {
@@ -257,6 +260,30 @@ private fun TopProductsCard(s: DashboardState) {
                         strokeCap = StrokeCap.Round,
                         drawStopIndicator = {},
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ExpiringCard(items: List<Purchase>) {
+    AppCard(Modifier.fillMaxWidth()) {
+        Column {
+            SectionTitle("Expiring soon") {
+                Icon(Icons.Rounded.WarningAmber, null, tint = Amber)
+            }
+            Spacer(Modifier.height(6.dp))
+            items.forEach { p ->
+                val exp = Fmt.epochDay(p.expiryDate) ?: return@forEach
+                Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    IconBadge(Icons.Rounded.EventBusy, if (Fmt.daysLeft(exp) < 0) Rose else Amber, size = 36.dp)
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(p.productName, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        com.parag.pricescanner.scan.ExpiryTag(exp)
+                    }
+                    Text("qty ${p.quantity}", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
         }

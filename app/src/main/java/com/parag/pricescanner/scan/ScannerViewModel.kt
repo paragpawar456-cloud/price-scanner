@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 import java.util.UUID
 
 data class CartItem(
@@ -19,6 +20,8 @@ data class CartItem(
     val qty: Int,
     val barcode: String? = null,
     val auto: Boolean = false,
+    val mfgDate: LocalDate? = null,
+    val expiryDate: LocalDate? = null,
 ) {
     val total get() = price * qty
     val needsPrice get() = price <= 0.0
@@ -31,6 +34,8 @@ data class Detection(
     val name: String?,
     val barcode: String?,
     val knownName: String? = null,
+    val mfgDate: LocalDate? = null,
+    val expiryDate: LocalDate? = null,
 ) {
     val displayName: String? get() = knownName ?: name
 }
@@ -56,6 +61,8 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
     private val counter = AutoCounter(stableFrames = 3, clearMillis = 700)
     private val recentPrices = ArrayDeque<Double?>()
     private val recentNames = ArrayDeque<String>()
+    private val recentMfg = ArrayDeque<LocalDate>()
+    private val recentExp = ArrayDeque<LocalDate>()
     private var eventSeq = 0L
     private val knownCache = mutableMapOf<String, Pair<String, Double>?>()
 
@@ -88,6 +95,14 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
         val stablePrice = recentPrices.filterNotNull().groupingBy { it }.eachCount()
             .filter { it.value >= 3 }.maxByOrNull { it.value }?.key
         val name = recentNames.groupingBy { it }.eachCount().maxByOrNull { it.value }?.key
+        // Dates are small print: keep the most frequent reading over the last few frames.
+        fun vote(q: ArrayDeque<LocalDate>, v: LocalDate?): LocalDate? {
+            v?.let { q.addLast(it); if (q.size > 8) q.removeFirst() }
+            if (frame.isEmpty) q.clear()
+            return q.groupingBy { it }.eachCount().filter { it.value >= 2 }.maxByOrNull { it.value }?.key
+        }
+        val mfg = vote(recentMfg, frame.mfgDate)
+        val exp = vote(recentExp, frame.expiryDate)
 
         val barcode = frame.barcode
         val known = barcode?.let { knownCache[it] }
@@ -100,6 +115,8 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
             name = name,
             barcode = barcode,
             knownName = known?.first,
+            mfgDate = mfg,
+            expiryDate = exp,
         )
         // Keep the last steady result while OCR settles; clear it once the frame is empty.
         _state.update { it.copy(detection = detection ?: if (frame.isEmpty) null else it.detection) }
@@ -128,25 +145,45 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
             }
             val cart = s.cart.toMutableList()
             val line = if (idx >= 0) {
-                cart[idx].copy(qty = cart[idx].qty + 1).also { cart[idx] = it }
+                cart[idx].copy(
+                    qty = cart[idx].qty + 1,
+                    mfgDate = cart[idx].mfgDate ?: d.mfgDate,
+                    expiryDate = cart[idx].expiryDate ?: d.expiryDate,
+                ).also { cart[idx] = it }
             } else {
                 val name = d.displayName ?: if (price > 0) "Item ₹${com.parag.pricescanner.util.Fmt.price(price)}" else "New item"
-                CartItem(name = name, price = price, qty = 1, barcode = d.barcode, auto = auto).also { cart.add(0, it) }
+                CartItem(
+                    name = name, price = price, qty = 1, barcode = d.barcode, auto = auto,
+                    mfgDate = d.mfgDate, expiryDate = d.expiryDate,
+                ).also { cart.add(0, it) }
             }
             s.copy(cart = cart, lastCount = CountEvent(++eventSeq, line.name, line.qty))
         }
     }
 
     /** Manual mode: add with explicit values. */
-    fun addManual(name: String, price: Double, qty: Int, barcode: String?) {
+    fun addManual(
+        name: String, price: Double, qty: Int, barcode: String?,
+        mfgDate: LocalDate? = null, expiryDate: LocalDate? = null,
+    ) {
         if (qty <= 0) return
         _state.update { s ->
             val idx = s.cart.indexOfFirst {
                 it.name.equals(name, ignoreCase = true) && it.price == price && it.barcode == barcode
             }
             val cart = s.cart.toMutableList()
-            if (idx >= 0) cart[idx] = cart[idx].copy(qty = cart[idx].qty + qty)
-            else cart.add(0, CartItem(name = name.ifBlank { "Item" }, price = price, qty = qty, barcode = barcode))
+            if (idx >= 0) cart[idx] = cart[idx].copy(
+                qty = cart[idx].qty + qty,
+                mfgDate = mfgDate ?: cart[idx].mfgDate,
+                expiryDate = expiryDate ?: cart[idx].expiryDate,
+            )
+            else cart.add(
+                0,
+                CartItem(
+                    name = name.ifBlank { "Item" }, price = price, qty = qty, barcode = barcode,
+                    mfgDate = mfgDate, expiryDate = expiryDate,
+                ),
+            )
             s.copy(cart = cart, lastCount = CountEvent(++eventSeq, name, qty))
         }
     }
@@ -180,6 +217,8 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                     quantity = it.qty,
                     timestamp = now,
                     source = if (it.auto) Purchase.SOURCE_AUTO else Purchase.SOURCE_MANUAL,
+                    mfgDate = it.mfgDate?.toEpochDay(),
+                    expiryDate = it.expiryDate?.toEpochDay(),
                 )
             })
             items.forEach { i -> i.barcode?.let { knownCache[it] = i.name to i.price } }
