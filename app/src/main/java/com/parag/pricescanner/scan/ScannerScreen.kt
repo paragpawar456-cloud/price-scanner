@@ -163,7 +163,7 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
                 modifier = Modifier.align(Alignment.TopCenter),
             )
 
-            AnimatedVisibility(
+            androidx.compose.animation.AnimatedVisibility(
                 visible = flash != null,
                 enter = scaleIn(initialScale = 0.6f) + fadeIn(),
                 exit = fadeOut() + scaleOut(targetScale = 1.1f),
