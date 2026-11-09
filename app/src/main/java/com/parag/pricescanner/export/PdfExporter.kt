@@ -122,6 +122,21 @@ object PdfExporter {
                     }
                     y += 14f
                 }
+                // Spend by category
+                val cats = items.groupBy { com.parag.pricescanner.scan.Category.of(it.category)?.label ?: "Other" }
+                    .map { (k, l) -> Triple(k, l.sumOf { it.quantity }, l.sumOf { it.total }) }
+                    .sortedByDescending { it.third }
+                if (cats.size > 1 || (cats.size == 1 && cats[0].first != "Other")) {
+                    c.drawText("Spend by category", M, y, paint(12f, ink, bold = true))
+                    y += 16f
+                    cats.forEach { (label, q, amt) ->
+                        c.drawText(label, M, y, cell)
+                        drawRight(c, "qty $q", colX[4], y, cellMuted)
+                        drawRight(c, Fmt.money(amt), right - 8, y, cellBold)
+                        y += 15f
+                    }
+                    y += 14f
+                }
                 c.drawText("Date-wise records", M, y, paint(12f, ink, bold = true))
                 y += 10f
             }
@@ -141,7 +156,8 @@ object PdfExporter {
             for (p in list) {
                 if (y > H - 70f) { newPage(first = false); firstRow = true }
                 if (firstRow) c.drawText(shortDate(day), colX[0] + 6, y, cellBold)
-                c.drawText(ellipsize(p.productName, cell, colX[2] - colX[1] - 8), colX[1], y, cell)
+                val catLabel = com.parag.pricescanner.scan.Category.of(p.category)?.label
+                c.drawText(ellipsize(p.productName + (catLabel?.let { " ($it)" } ?: ""), cell, colX[2] - colX[1] - 8), colX[1], y, cell)
                 Fmt.epochDay(p.mfgDate)?.let { c.drawText(shortDate(it), colX[2], y, cellMuted) }
                 Fmt.epochDay(p.expiryDate)?.let {
                     c.drawText(shortDate(it), colX[3], y, if (it.isBefore(java.time.LocalDate.now())) expired else cellMuted)

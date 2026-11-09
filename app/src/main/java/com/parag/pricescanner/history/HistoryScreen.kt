@@ -164,6 +164,23 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
                     }
                 }
             }
+            item {
+                LazyRow(
+                    contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    item {
+                        FilterChip(selected = s.filter.category == null, onClick = { vm.setCategory(null) }, label = { Text("All types") })
+                    }
+                    items(com.parag.pricescanner.scan.Category.entries) { c ->
+                        FilterChip(
+                            selected = s.filter.category == c,
+                            onClick = { vm.setCategory(if (s.filter.category == c) null else c) },
+                            label = { Text(c.label) },
+                        )
+                    }
+                }
+            }
             item { SummaryStrip(s) }
 
             if (!s.loading && s.groups.isEmpty()) {
@@ -209,7 +226,7 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
             showDate = true,
             onDismiss = { adding = false },
             onSave = { d ->
-                vm.add(d.name, d.price ?: 0.0, d.qty, d.date ?: java.time.LocalDate.now(), d.mfgDate, d.expiryDate)
+                vm.add(d.name, d.price ?: 0.0, d.qty, d.date ?: java.time.LocalDate.now(), d.mfgDate, d.expiryDate, d.category)
                 adding = false
             },
         )
@@ -220,14 +237,16 @@ fun HistoryScreen(vm: HistoryViewModel = viewModel()) {
             initial = ItemDraft(
                 p.productName, p.unitPrice, p.quantity, Fmt.date(p.timestamp),
                 Fmt.epochDay(p.mfgDate), Fmt.epochDay(p.expiryDate),
+                com.parag.pricescanner.scan.Category.of(p.category),
             ),
+            details = com.parag.pricescanner.scan.ProductDetails.decode(p.details),
             nutrition = com.parag.pricescanner.scan.Nutrition.decode(p.nutrition),
             imageUrl = p.imageUrl,
             nameSuggestions = names,
             showDate = true,
             onDismiss = { editing = null },
             onSave = { d ->
-                vm.update(p, d.name, d.price ?: p.unitPrice, d.qty, d.date ?: Fmt.date(p.timestamp), d.mfgDate, d.expiryDate)
+                vm.update(p, d.name, d.price ?: p.unitPrice, d.qty, d.date ?: Fmt.date(p.timestamp), d.mfgDate, d.expiryDate, d.category)
                 editing = null
             },
             onDelete = {
@@ -327,6 +346,9 @@ private fun PurchaseRow(p: Purchase, onClick: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            com.parag.pricescanner.scan.Category.of(p.category)?.let {
+                com.parag.pricescanner.ui.components.CategoryChip(it, Modifier.padding(top = 3.dp))
+            }
             val mfg = Fmt.epochDay(p.mfgDate)
             val exp = Fmt.epochDay(p.expiryDate)
             if (mfg != null || exp != null) {

@@ -29,6 +29,10 @@ data class CartItem(
     /** True once the name came from the user or a trusted source, so scanning stops changing it. */
     val nameLocked: Boolean = false,
     val imageUrl: String? = null,
+    val category: Category? = null,
+    val details: ProductDetails? = null,
+    /** True once the user picked the category, so scanning stops changing it. */
+    val categoryLocked: Boolean = false,
 ) {
     val total get() = price * qty
     val needsPrice get() = price <= 0.0
@@ -45,6 +49,8 @@ data class Detection(
     val expiryDate: LocalDate? = null,
     val nutrition: Nutrition? = null,
     val imageUrl: String? = null,
+    val category: Category? = null,
+    val details: ProductDetails? = null,
 ) {
     val displayName: String? get() = knownName ?: name
 }
@@ -115,8 +121,13 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
             expiryDate = snap.expiryDate,
             nutrition = (snap.nutrition ?: Nutrition()).merge(Nutrition.decode(kp?.nutrition)).takeIf { !it.isEmpty },
             imageUrl = kp?.imageUrl,
+            // The online database (food only) is more reliable than label words, except for strong non-food clues.
+            category = Category.of(kp?.category)?.takeIf { snap.category == null || snap.category == Category.FOOD || snap.category == Category.GROCERY }
+                ?: snap.category,
+            details = (snap.details ?: ProductDetails()).merge(ProductDetails.decode(kp?.details)).takeIf { !it.isEmpty },
         )
-        val showable = snap.identified || detection.nutrition != null || detection.mfgDate != null || detection.expiryDate != null
+        val showable = snap.identified || detection.nutrition != null || detection.mfgDate != null ||
+            detection.expiryDate != null || detection.details != null
         _state.update { s -> s.copy(detection = detection.takeIf { showable }) }
 
         if (!_state.value.autoMode) return
@@ -143,6 +154,8 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                 expiryDate = item.expiryDate ?: d.expiryDate,
                 nutrition = (d.nutrition ?: Nutrition()).merge(item.nutrition).takeIf { !it.isEmpty },
                 imageUrl = item.imageUrl ?: d.imageUrl,
+                category = if (item.categoryLocked) item.category else d.category ?: item.category,
+                details = (item.details ?: ProductDetails()).merge(d.details).takeIf { !it.isEmpty },
             )
         })
     }
@@ -187,6 +200,9 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                         lastPrice = local?.lastPrice ?: 0.0,
                         nutrition = online.nutrition?.encode() ?: local?.nutrition,
                         imageUrl = online.imageUrl ?: local?.imageUrl,
+                        category = local?.category ?: online.category.name,
+                        details = (online.details ?: ProductDetails()).merge(ProductDetails.decode(local?.details))
+                            .takeIf { !it.isEmpty }?.encode(),
                     )
                     known[barcode] = merged
                     repo.rememberProduct(merged)
@@ -209,6 +225,8 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                 price = if (item.needsPrice && kp.lastPrice > 0) kp.lastPrice else item.price,
                 nutrition = (item.nutrition ?: Nutrition()).merge(Nutrition.decode(kp.nutrition)).takeIf { !it.isEmpty },
                 imageUrl = item.imageUrl ?: kp.imageUrl,
+                category = if (item.categoryLocked) item.category else Category.of(kp.category) ?: item.category,
+                details = (item.details ?: ProductDetails()).merge(ProductDetails.decode(kp.details)).takeIf { !it.isEmpty },
             )
         })
     }
@@ -234,6 +252,8 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                     expiryDate = cart[idx].expiryDate ?: d.expiryDate,
                     nutrition = (cart[idx].nutrition ?: Nutrition()).merge(d.nutrition).takeIf { !it.isEmpty },
                     imageUrl = cart[idx].imageUrl ?: d.imageUrl,
+                    category = cart[idx].category ?: d.category,
+                    details = (cart[idx].details ?: ProductDetails()).merge(d.details).takeIf { !it.isEmpty },
                 ).also { cart[idx] = it; result = it.id to false }
             } else {
                 val name = d.displayName ?: if (price > 0) "Item ₹${Fmt.price(price)}" else "New item"
@@ -241,6 +261,7 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                     name = name, price = price, qty = 1, barcode = d.barcode, auto = auto,
                     mfgDate = d.mfgDate, expiryDate = d.expiryDate, nutrition = d.nutrition,
                     nameLocked = d.knownName != null, imageUrl = d.imageUrl,
+                    category = d.category, details = d.details,
                 ).also { cart.add(0, it); result = it.id to true }
             }
             s.copy(cart = cart, lastCount = CountEvent(++eventSeq, line.name, line.qty))
@@ -252,7 +273,7 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
     fun addManual(
         name: String, price: Double, qty: Int, barcode: String?,
         mfgDate: LocalDate? = null, expiryDate: LocalDate? = null, nutrition: Nutrition? = null,
-        imageUrl: String? = null,
+        imageUrl: String? = null, category: Category? = null, details: ProductDetails? = null,
     ) {
         if (qty <= 0) return
         _state.update { s ->
@@ -267,13 +288,15 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                 expiryDate = expiryDate ?: cart[idx].expiryDate,
                 nutrition = (nutrition ?: Nutrition()).merge(cart[idx].nutrition).takeIf { !it.isEmpty },
                 imageUrl = cart[idx].imageUrl ?: imageUrl,
+                category = category ?: cart[idx].category,
+                details = (details ?: ProductDetails()).merge(cart[idx].details).takeIf { !it.isEmpty },
             )
             else cart.add(
                 0,
                 CartItem(
                     name = name.ifBlank { "Item" }, price = price, qty = qty, barcode = barcode,
                     mfgDate = mfgDate, expiryDate = expiryDate, nutrition = nutrition, nameLocked = true,
-                    imageUrl = imageUrl,
+                    imageUrl = imageUrl, category = category, details = details, categoryLocked = category != null,
                 ),
             )
             s.copy(cart = cart, lastCount = CountEvent(++eventSeq, name, qty))
@@ -322,10 +345,12 @@ class ScannerViewModel(app: Application) : AndroidViewModel(app) {
                     expiryDate = it.expiryDate?.toEpochDay(),
                     nutrition = it.nutrition?.encode(),
                     imageUrl = it.imageUrl,
+                    category = it.category?.name,
+                    details = it.details?.encode(),
                 )
             })
             items.forEach { i ->
-                i.barcode?.let { known[it] = KnownProduct(it, i.name, i.price, i.nutrition?.encode(), i.imageUrl) }
+                i.barcode?.let { known[it] = KnownProduct(it, i.name, i.price, i.nutrition?.encode(), i.imageUrl, i.category?.name, i.details?.encode()) }
             }
             tracker.reset()
             sessionLine = null

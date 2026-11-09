@@ -56,6 +56,7 @@ data class ItemDraft(
     val date: LocalDate? = null,
     val mfgDate: LocalDate? = null,
     val expiryDate: LocalDate? = null,
+    val category: com.parag.pricescanner.scan.Category? = null,
 )
 
 private enum class PickFor { DATE, MFG, EXPIRY }
@@ -74,6 +75,7 @@ fun ItemEditorSheet(
     onDelete: (() -> Unit)? = null,
     nutrition: com.parag.pricescanner.scan.Nutrition? = null,
     imageUrl: String? = null,
+    details: com.parag.pricescanner.scan.ProductDetails? = null,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var name by remember { mutableStateOf(initial.name) }
@@ -82,6 +84,7 @@ fun ItemEditorSheet(
     var qtyText by remember { mutableStateOf(initial.qty.coerceAtLeast(1).toString()) }
     var date by remember { mutableStateOf(initial.date ?: LocalDate.now()) }
     var mfg by remember { mutableStateOf(initial.mfgDate) }
+    var category by remember { mutableStateOf(initial.category) }
     var exp by remember { mutableStateOf(initial.expiryDate) }
     var pickFor by remember { mutableStateOf<PickFor?>(null) }
 
@@ -122,6 +125,10 @@ fun ItemEditorSheet(
                     items(matches) { s -> SuggestionChip(onClick = { name = s }, label = { Text(s) }) }
                 }
             }
+            Spacer(Modifier.height(10.dp))
+            Text("Category", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            CategoryPicker(category, { category = it })
             Spacer(Modifier.height(12.dp))
 
             OutlinedTextField(
@@ -174,7 +181,11 @@ fun ItemEditorSheet(
                 DateField("Expiry / use by", exp, { pickFor = PickFor.EXPIRY }, { exp = null }, Modifier.weight(1f))
             }
 
-            if (nutrition != null && !nutrition.isEmpty) {
+            if (details != null && !details.isEmpty) {
+                Spacer(Modifier.height(12.dp))
+                DetailsCard(details, category)
+            }
+            if (nutrition != null && !nutrition.isEmpty && (category == null || category!!.hasNutrition)) {
                 Spacer(Modifier.height(12.dp))
                 NutritionCard(nutrition)
             }
@@ -200,7 +211,7 @@ fun ItemEditorSheet(
             }
             Spacer(Modifier.height(12.dp))
             Button(
-                onClick = { onSave(ItemDraft(name.trim(), price, qty, if (showDate) date else null, mfg, exp)) },
+                onClick = { onSave(ItemDraft(name.trim(), price, qty, if (showDate) date else null, mfg, exp, category)) },
                 enabled = valid,
                 modifier = Modifier.fillMaxWidth().height(52.dp),
             ) { Text(confirmLabel) }

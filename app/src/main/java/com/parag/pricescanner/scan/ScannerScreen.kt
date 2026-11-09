@@ -197,8 +197,9 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
             title = if (d == null) "Add item" else "Add scanned item",
             initial = ItemDraft(
                 name = d?.displayName.orEmpty(), price = d?.price, qty = 1,
-                mfgDate = d?.mfgDate, expiryDate = d?.expiryDate,
+                mfgDate = d?.mfgDate, expiryDate = d?.expiryDate, category = d?.category,
             ),
+            details = d?.details,
             priceSuggestions = d?.alternatives.orEmpty(),
             nutrition = d?.nutrition,
             imageUrl = d?.imageUrl,
@@ -206,7 +207,10 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
             confirmLabel = "Add to list",
             onDismiss = { captureOpen = false },
             onSave = { draft ->
-                vm.addManual(draft.name, draft.price ?: 0.0, draft.qty, d?.barcode, draft.mfgDate, draft.expiryDate, d?.nutrition, d?.imageUrl)
+                vm.addManual(
+                    draft.name, draft.price ?: 0.0, draft.qty, d?.barcode, draft.mfgDate, draft.expiryDate,
+                    d?.nutrition, d?.imageUrl, draft.category, d?.details,
+                )
                 captureOpen = false
             },
         )
@@ -214,7 +218,8 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
     editing?.let { item ->
         ItemEditorSheet(
             title = "Edit item",
-            initial = ItemDraft(item.name, item.price, item.qty, mfgDate = item.mfgDate, expiryDate = item.expiryDate),
+            initial = ItemDraft(item.name, item.price, item.qty, mfgDate = item.mfgDate, expiryDate = item.expiryDate, category = item.category),
+            details = item.details,
             nutrition = item.nutrition,
             imageUrl = item.imageUrl,
             nameSuggestions = names,
@@ -224,6 +229,8 @@ fun ScannerScreen(vm: ScannerViewModel = viewModel()) {
                     item.copy(
                         name = draft.name, price = draft.price ?: item.price, qty = draft.qty, auto = false,
                         mfgDate = draft.mfgDate, expiryDate = draft.expiryDate,
+                        category = draft.category,
+                        categoryLocked = item.categoryLocked || draft.category != item.category,
                     )
                 )
                 editing = null
@@ -318,6 +325,10 @@ private fun DetectionBubble(d: Detection?, modifier: Modifier = Modifier, onClic
                     Spacer(Modifier.width(8.dp))
                 }
                 Column {
+                    d.category?.let {
+                        com.parag.pricescanner.ui.components.CategoryChip(it, onDark = true)
+                        Spacer(Modifier.height(4.dp))
+                    }
                     Text(
                         d.price?.let { Fmt.money(it) } ?: "Price not found",
                         fontSize = 22.sp,
@@ -537,6 +548,7 @@ private fun CartRow(item: CartItem, onClick: () -> Unit, onQty: (Int) -> Unit) {
                     style = MaterialTheme.typography.bodySmall,
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    item.category?.let { com.parag.pricescanner.ui.components.CategoryChip(it) }
                     item.expiryDate?.let { ExpiryTag(it) }
                     item.nutrition?.warnings()?.firstOrNull()?.let { com.parag.pricescanner.ui.components.WarningPill(it) }
                 }

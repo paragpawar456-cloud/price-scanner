@@ -14,7 +14,7 @@ class Repository private constructor(private val db: AppDatabase) {
         if (items.isEmpty()) return
         db.purchases().insertAll(items)
         val known = items.filter { !it.barcode.isNullOrBlank() }
-            .map { KnownProduct(it.barcode!!, it.productName, it.unitPrice, it.nutrition, it.imageUrl) }
+            .map { KnownProduct(it.barcode!!, it.productName, it.unitPrice, it.nutrition, it.imageUrl, it.category, it.details) }
         if (known.isNotEmpty()) db.knownProducts().upsertAll(known)
     }
 
@@ -22,7 +22,7 @@ class Repository private constructor(private val db: AppDatabase) {
     suspend fun update(item: Purchase) {
         db.purchases().update(item)
         item.barcode?.takeIf { it.isNotBlank() }?.let {
-            db.knownProducts().upsert(KnownProduct(it, item.productName, item.unitPrice, item.nutrition, item.imageUrl))
+            db.knownProducts().upsert(KnownProduct(it, item.productName, item.unitPrice, item.nutrition, item.imageUrl, item.category, item.details))
         }
     }
     suspend fun delete(item: Purchase) = db.purchases().delete(item)

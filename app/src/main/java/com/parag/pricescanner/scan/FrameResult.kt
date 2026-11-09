@@ -10,6 +10,8 @@ data class FrameResult(
     val mfgDate: LocalDate? = null,
     val expiryDate: LocalDate? = null,
     val nutrition: Nutrition? = null,
+    val details: ProductDetails? = null,
+    val categoryScores: Map<Category, Int> = emptyMap(),
 ) {
     val bestPrice: Double? get() = prices.firstOrNull()?.value
     val isEmpty: Boolean get() = prices.isEmpty() && barcode == null

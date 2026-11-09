@@ -28,6 +28,7 @@ data class Filter(
     val customStart: LocalDate? = null,
     val customEnd: LocalDate? = null,
     val query: String = "",
+    val category: com.parag.pricescanner.scan.Category? = null,
 ) {
     /** Inclusive date bounds, or nulls for no bound. */
     fun bounds(today: LocalDate = LocalDate.now()): Pair<LocalDate?, LocalDate?> = when (period) {
@@ -44,7 +45,7 @@ data class Filter(
             s == null -> "All records"
             s == e -> Fmt.dayFull(s)
             else -> Fmt.dayFull(s) + " – " + Fmt.dayFull(e ?: LocalDate.now())
-        } + if (query.isNotBlank()) " · \"$query\"" else ""
+        } + (if (category != null) " · ${category.label}" else "") + if (query.isNotBlank()) " · \"$query\"" else ""
     }
 }
 
@@ -75,7 +76,8 @@ class HistoryViewModel(private val app: Application) : AndroidViewModel(app) {
         val list = all.filter { p ->
             val d = Fmt.date(p.timestamp)
             (s == null || !d.isBefore(s)) && (e == null || !d.isAfter(e)) &&
-                (q.isEmpty() || p.productName.contains(q, ignoreCase = true) || p.barcode?.contains(q) == true)
+                (q.isEmpty() || p.productName.contains(q, ignoreCase = true) || p.barcode?.contains(q) == true) &&
+                (f.category == null || p.category == f.category.name)
         }
         HistoryState(
             filter = f,
@@ -90,6 +92,7 @@ class HistoryViewModel(private val app: Application) : AndroidViewModel(app) {
         filter.value = filter.value.copy(period = Period.CUSTOM, customStart = start, customEnd = end)
     }
     fun setQuery(q: String) { filter.value = filter.value.copy(query = q) }
+    fun setCategory(c: com.parag.pricescanner.scan.Category?) { filter.value = filter.value.copy(category = c) }
 
     /** Keeps the original time of day when the date is changed. */
     private fun timestampFor(date: LocalDate, original: Long?): Long {
@@ -98,22 +101,30 @@ class HistoryViewModel(private val app: Application) : AndroidViewModel(app) {
         return date.atTime(time).atZone(Fmt.zone).toInstant().toEpochMilli()
     }
 
-    fun add(name: String, price: Double, qty: Int, date: LocalDate, mfg: LocalDate?, exp: LocalDate?) = viewModelScope.launch {
+    fun add(
+        name: String, price: Double, qty: Int, date: LocalDate, mfg: LocalDate?, exp: LocalDate?,
+        category: com.parag.pricescanner.scan.Category?,
+    ) = viewModelScope.launch {
         repo.add(
             Purchase(
                 productName = name, unitPrice = price, quantity = qty, timestamp = timestampFor(date, null),
+                category = category?.name,
                 mfgDate = mfg?.toEpochDay(), expiryDate = exp?.toEpochDay(),
             )
         )
         runCatching { repo.fillPhoto(name) }
     }
 
-    fun update(p: Purchase, name: String, price: Double, qty: Int, date: LocalDate, mfg: LocalDate?, exp: LocalDate?) = viewModelScope.launch {
+    fun update(
+        p: Purchase, name: String, price: Double, qty: Int, date: LocalDate, mfg: LocalDate?, exp: LocalDate?,
+        category: com.parag.pricescanner.scan.Category?,
+    ) = viewModelScope.launch {
         val renamed = name != p.productName && p.barcode == null
         repo.update(
             p.copy(
                 productName = name, unitPrice = price, quantity = qty,
                 imageUrl = if (renamed) null else p.imageUrl,
+                category = category?.name,
                 mfgDate = mfg?.toEpochDay(), expiryDate = exp?.toEpochDay(),
                 timestamp = if (Fmt.date(p.timestamp) == date) p.timestamp else timestampFor(date, p.timestamp),
                 source = Purchase.SOURCE_MANUAL,

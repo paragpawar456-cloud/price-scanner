@@ -26,6 +26,8 @@ class SessionTracker(
         val mfgDate: LocalDate?,
         val expiryDate: LocalDate?,
         val nutrition: Nutrition?,
+        val details: ProductDetails?,
+        val category: Category?,
         /** True on exactly one frame per session: when the item first becomes identifiable. */
         val countNow: Boolean,
     ) {
@@ -43,10 +45,13 @@ class SessionTracker(
     private val mfg = mutableMapOf<LocalDate, Int>()
     private val exp = mutableMapOf<LocalDate, Int>()
     private val nutritionVotes = mutableMapOf<String, MutableMap<Double, Int>>()
+    private val categoryScores = mutableMapOf<Category, Int>()
+    private var details: ProductDetails? = null
 
     /** @return the current session snapshot, or null when no pack is in view. */
     fun onFrame(f: FrameResult, now: Long): Snapshot? {
-        val hasContent = !f.isEmpty || f.mfgDate != null || f.expiryDate != null || f.nutrition?.isEmpty == false
+        val hasContent = !f.isEmpty || f.mfgDate != null || f.expiryDate != null || f.nutrition?.isEmpty == false ||
+            f.details?.isEmpty == false || f.categoryScores.values.sum() >= 3
         if (!hasContent) {
             if (active && now - lastContentAt >= clearMillis) reset()
             return if (active) snapshot(countNow = false) else null
@@ -63,6 +68,8 @@ class SessionTracker(
         f.nameGuess?.let { names.inc(it) }
         f.mfgDate?.let { mfg.inc(it) }
         f.expiryDate?.let { exp.inc(it) }
+        f.categoryScores.forEach { (c, v) -> categoryScores[c] = (categoryScores[c] ?: 0) + v }
+        f.details?.let { d -> details = (details ?: ProductDetails()).merge(d) }
         f.nutrition?.toMap()?.forEach { (k, v) -> nutritionVotes.getOrPut(k) { mutableMapOf() }.inc(v) }
 
         val snap = snapshot(countNow = false)
@@ -86,6 +93,8 @@ class SessionTracker(
             mfgDate = mfg.best(2),
             expiryDate = exp.best(2),
             nutrition = Nutrition.decode(nut),
+            details = details,
+            category = DetailsParser.decide(categoryScores),
             countNow = countNow,
         )
     }
@@ -94,6 +103,7 @@ class SessionTracker(
         active = false
         counted = false
         prices.clear(); barcodes.clear(); names.clear(); mfg.clear(); exp.clear(); nutritionVotes.clear()
+        categoryScores.clear(); details = null
     }
 
     private fun <K> MutableMap<K, Int>.inc(k: K) { this[k] = (this[k] ?: 0) + 1 }

@@ -5,13 +5,22 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [Purchase::class, KnownProduct::class], version = 4, exportSchema = true)
+@Database(entities = [Purchase::class, KnownProduct::class], version = 5, exportSchema = true)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun purchases(): PurchaseDao
     abstract fun knownProducts(): KnownProductDao
 
     companion object {
         @Volatile private var instance: AppDatabase? = null
+
+        private val MIGRATION_4_5 = object : androidx.room.migration.Migration(4, 5) {
+            override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE purchases ADD COLUMN category TEXT")
+                db.execSQL("ALTER TABLE purchases ADD COLUMN details TEXT")
+                db.execSQL("ALTER TABLE known_products ADD COLUMN category TEXT")
+                db.execSQL("ALTER TABLE known_products ADD COLUMN details TEXT")
+            }
+        }
 
         private val MIGRATION_3_4 = object : androidx.room.migration.Migration(3, 4) {
             override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
@@ -36,7 +45,7 @@ abstract class AppDatabase : RoomDatabase() {
 
         fun get(context: Context): AppDatabase = instance ?: synchronized(this) {
             instance ?: Room.databaseBuilder(context.applicationContext, AppDatabase::class.java, "pricescan.db")
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build()
                 .also { instance = it }
         }

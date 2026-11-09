@@ -52,6 +52,7 @@ import com.parag.pricescanner.ui.components.AppCard
 import com.parag.pricescanner.ui.components.EmptyState
 import com.parag.pricescanner.ui.components.IconBadge
 import com.parag.pricescanner.ui.components.SectionTitle
+import com.parag.pricescanner.ui.components.color
 import com.parag.pricescanner.ui.theme.Amber
 import com.parag.pricescanner.ui.theme.Indigo
 import com.parag.pricescanner.ui.theme.IndigoDeep
@@ -128,6 +129,7 @@ fun DashboardScreen(vm: DashboardViewModel = viewModel()) {
                 }
             }
         }
+        if (s.byCategory.isNotEmpty()) item { CategoryCard(s) }
         if (s.expiring.isNotEmpty()) item { ExpiringCard(s.expiring) }
         item { TopProductsCard(s) }
         item { RecentCard(s.recent) }
@@ -262,6 +264,37 @@ private fun TopProductsCard(s: DashboardState) {
                         strokeCap = StrokeCap.Round,
                         drawStopIndicator = {},
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CategoryCard(s: DashboardState) {
+    AppCard(Modifier.fillMaxWidth()) {
+        Column {
+            SectionTitle("Spend by category") {
+                Text(s.range.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(12.dp))
+            val total = s.byCategory.sumOf { it.spend }.takeIf { it > 0 } ?: 1.0
+            // Stacked share bar
+            Row(Modifier.fillMaxWidth().height(12.dp).clip(CircleShape)) {
+                s.byCategory.forEach { c ->
+                    val w = (c.spend / total).toFloat()
+                    if (w > 0f) Box(Modifier.weight(w).fillMaxSize().background(c.category.color))
+                }
+            }
+            Spacer(Modifier.height(10.dp))
+            s.byCategory.forEach { c ->
+                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    com.parag.pricescanner.ui.components.CategoryChip(c.category)
+                    Spacer(Modifier.width(8.dp))
+                    Text("qty ${c.qty}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    Text("%.0f%%".format(c.spend / total * 100), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.width(12.dp))
+                    Text(Fmt.money(c.spend), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
                 }
             }
         }

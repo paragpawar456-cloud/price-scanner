@@ -68,7 +68,13 @@ class ScanAnalyzer(
 
                 val barcode = codes.firstOrNull { !it.rawValue.isNullOrBlank() }?.rawValue
                 val nutrition = NutritionParser.parse(lines).takeIf { !it.isEmpty }
-                onResult(FrameResult(label.prices, name, barcode, label.mfgDate, label.expiryDate, nutrition))
+                val info = DetailsParser.parse(lines)
+                onResult(
+                    FrameResult(
+                        label.prices, name, barcode, label.mfgDate, label.expiryDate, nutrition,
+                        info.details.takeIf { !it.isEmpty }, info.categoryScores,
+                    )
+                )
             } finally {
                 imageProxy.close()
             }

@@ -23,6 +23,10 @@ data class Purchase(
     val nutrition: String? = null,
     /** Product photo URL found online (Open Food Facts). */
     val imageUrl: String? = null,
+    /** Category enum name (see scan.Category). */
+    val category: String? = null,
+    /** Product details, encoded by ProductDetails.encode(). */
+    val details: String? = null,
 ) {
     val total: Double get() = unitPrice * quantity
 
@@ -40,4 +44,6 @@ data class KnownProduct(
     val lastPrice: Double,
     val nutrition: String? = null,
     val imageUrl: String? = null,
+    val category: String? = null,
+    val details: String? = null,
 )

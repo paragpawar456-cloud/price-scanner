@@ -20,6 +20,7 @@ import java.time.temporal.TemporalAdjusters
 enum class ChartRange(val label: String) { WEEK("7 days"), MONTH("30 days"), YEAR("12 months") }
 
 data class Bar(val label: String, val value: Double, val detail: String)
+data class CategoryStat(val category: com.parag.pricescanner.scan.Category, val spend: Double, val qty: Int)
 data class ProductStat(val name: String, val qty: Int, val spend: Double, val imageUrl: String? = null)
 
 data class DashboardState(
@@ -40,6 +41,7 @@ data class DashboardState(
     val recent: List<Purchase> = emptyList(),
     /** Purchases with an expiry date within the next 30 days or already past (last 60 days), soonest first. */
     val expiring: List<Purchase> = emptyList(),
+    val byCategory: List<CategoryStat> = emptyList(),
 ) {
     /** Month-over-month change in percent, null when there is nothing to compare. */
     val monthChange: Double? get() = if (lastMonth > 0) (month - lastMonth) / lastMonth * 100 else null
@@ -107,6 +109,9 @@ class DashboardViewModel(app: Application) : AndroidViewModel(app) {
             rangeTotal = bars.sumOf { it.value },
             topProducts = top,
             recent = all.take(6),
+            byCategory = inRange.groupBy { com.parag.pricescanner.scan.Category.of(it.category) ?: com.parag.pricescanner.scan.Category.OTHER }
+                .map { (c, l) -> CategoryStat(c, l.sumOf { it.total }, l.sumOf { it.quantity }) }
+                .sortedByDescending { it.spend },
             expiring = all.filter { p ->
                 p.expiryDate?.let { it <= today.plusDays(30).toEpochDay() && it >= today.minusDays(60).toEpochDay() } == true
             }.sortedBy { it.expiryDate }.take(6),

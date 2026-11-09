@@ -13,14 +13,22 @@ import java.net.URL
  */
 object ProductLookup {
 
-    data class Info(val name: String, val nutrition: Nutrition?, val imageUrl: String?)
+    data class Info(
+        val name: String,
+        val nutrition: Nutrition?,
+        val imageUrl: String?,
+        val category: com.parag.pricescanner.scan.Category = com.parag.pricescanner.scan.Category.FOOD,
+        val details: com.parag.pricescanner.scan.ProductDetails? = null,
+    )
 
     suspend fun fetch(barcode: String): Info? = withContext(Dispatchers.IO) {
         if (!barcode.all { it.isDigit() } || barcode.length !in 8..14) return@withContext null
         runCatching {
             val url = URL(
                 "https://world.openfoodfacts.org/api/v2/product/$barcode.json" +
-                    "?fields=product_name,product_name_en,brands,quantity,nutriments,image_front_small_url,image_front_url,image_url"
+                    "?fields=product_name,product_name_en,brands,quantity,nutriments,image_front_small_url,image_front_url,image_url," +
+                    "categories_tags,ingredients_text_en,ingredients_text,allergens_tags,nutriscore_grade,nova_group," +
+                    "ingredients_analysis_tags,origins,manufacturing_places"
             )
             val conn = (url.openConnection() as HttpURLConnection).apply {
                 connectTimeout = 6000
@@ -106,6 +114,32 @@ object ProductLookup {
             sodiumMg = sodiumMg,
             fiber = d("fiber_100g"),
         ).takeIf { !it.isEmpty }
-        return Info(name, nutrition, imageOf(p))
+        fun tags(key: String): List<String> = p.optJSONArray(key)?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
+        fun pretty(tag: String) = tag.substringAfter(':').replace('-', ' ').replaceFirstChar { it.uppercase() }
+        val analysis = tags("ingredients_analysis_tags")
+        val nova = p.optInt("nova_group", 0)
+        val details = com.parag.pricescanner.scan.ProductDetails(
+            brand = brand.ifEmpty { null },
+            netQuantity = qty.ifEmpty { null },
+            ingredients = p.optString("ingredients_text_en").ifBlank { p.optString("ingredients_text") }.trim().ifEmpty { null },
+            allergens = tags("allergens_tags").map(::pretty).joinToString(", ").ifEmpty { null },
+            diet = when {
+                "en:vegan" in analysis -> "Vegan"
+                "en:vegetarian" in analysis -> "Vegetarian"
+                "en:non-vegetarian" in analysis -> "Non-vegetarian"
+                else -> null
+            },
+            nutriScore = p.optString("nutriscore_grade").takeIf { it.length == 1 && it[0] in 'a'..'e' }?.uppercase(),
+            processing = when (nova) {
+                1 -> "Unprocessed or minimally processed (NOVA 1)"
+                2 -> "Processed culinary ingredient (NOVA 2)"
+                3 -> "Processed food (NOVA 3)"
+                4 -> "Ultra-processed food (NOVA 4)"
+                else -> null
+            },
+            origin = p.optString("origins").ifBlank { p.optString("manufacturing_places") }.trim().ifEmpty { null },
+        ).takeIf { !it.isEmpty }
+        val category = com.parag.pricescanner.scan.DetailsParser.fromFoodTags(tags("categories_tags"))
+        return Info(name, nutrition, imageOf(p), category, details)
     }
 }
